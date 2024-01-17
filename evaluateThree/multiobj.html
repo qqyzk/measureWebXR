@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<title>Basic Scene with WebXR</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+	<!-- <link type="text/css" rel="stylesheet" href="style.css"> -->
+  <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r126/three.js" crossorigin="anonymous"></script> -->
+</head>
+
+<body>
+    <input  id="button" type="button" value="start" > 
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./src/three.module.js",
+                "OBJLoader":"./src/OBJLoader.js",
+                "RoomEnvironment": "./src/RoomEnvironment.js",
+                "stats": "./src/myStats.js",
+                "MTLLoader": "./src/MTLLoader.js"
+
+            }
+        }
+    </script> 
+	<script type="module">
+    
+        // To start an AR scene with webXR, we can use a handy button provided by three.js
+        // We first have to import it because it is a javascript module
+       
+        import * as THREE from 'three';
+        import { OBJLoader } from 'OBJLoader';
+        import { RoomEnvironment } from 'RoomEnvironment';
+        import Stats from 'stats';
+        import {MTLLoader} from 'MTLLoader';
+        let name = 'BoxTextured';
+        let N=32;
+        let camera, scene, renderer,controls,stats,content;
+        let loader,mesh; // we need to create a variable for a gltf model loader
+        let models = [];
+        var btn = document.getElementById("button");  
+        btn.onclick = function conduct(){
+            let loaded=false;
+        let initTime = ( performance || Date ).now()
+        console.log('init time',initTime);
+		init();
+		// animate();
+
+		function init() { 
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+            stats = new Stats();
+            stats.dom.style.top = '20px';
+            stats.dom.style.left = '300px';
+            container.appendChild(stats.dom);
+            renderer = new THREE.WebGLRenderer({alpha: true });
+			renderer.setPixelRatio(window.devicePixelRatio);
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			container.appendChild(renderer.domElement);
+           
+            const pmremGenerator = new THREE.PMREMGenerator( renderer );
+			scene = new THREE.Scene();
+            scene.environment = pmremGenerator.fromScene( new RoomEnvironment(), 0.04 ).texture;
+            const ambientLight = new THREE.AmbientLight( 0xcccccc, 1.4 );
+			scene.add( ambientLight );
+			camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight,1,100 );
+            let url;
+            if(name==='Box' ){
+                url='../obj/Box/';
+            }else if(name==='BoxTextured' ){
+                url='../obj/BoxTextured4/';
+            }else if(name==='BoomBox' ){
+                url='../obj/BoomBox/';
+            }else if(name==='DamagedHelmet' ){
+                url='../obj/DamagedHelmet/';
+            }
+            var mtlLoader = new MTLLoader();
+	       
+	        mtlLoader.setPath( url )
+                .load(name+'.mtl', function(materials){
+	            materials.preload();
+                var objLoader = new OBJLoader();
+                objLoader.setMaterials(materials);
+                objLoader.setPath(url)
+                    .load( name+'.obj', function ( obj ) {
+                    let minx = -0.5, miny = -0.8, minz= -20;
+                    let maxx = 0.5, maxy=0.8, maxz=-3;
+                    let scale;
+                    if(name==="Box"){
+                        scale=0.05;
+                    }else if(name==='BoxTextured'){
+                        scale=0.05;
+                    }else if (name==='BoomBox'){
+                        scale=4;
+                    }else if(name==='DamagedHelmet'){
+                        scale=0.05;
+                    }
+                    let edgeNum=N;
+                    for(let i=0;i<edgeNum;++i){
+                        for(let j=0;j<edgeNum;++j){
+                            for(let k=0;k<edgeNum;++k){
+                                let curx = minx + (maxx-minx)/(edgeNum-1)*i;
+                                let cury = miny+ (maxy-miny)/(edgeNum-1)*j;
+                                let curz = minz + (maxz-minz)/(edgeNum-1)*k;
+                                let model = obj.clone();
+                                model.position.set( curx,cury,curz);
+                                model.scale.set( scale,scale,scale );
+                                scene.add( model); 
+                            }
+                        }
+                    }
+                    console.log('model loaded time',performance.now());
+                    loaded=true;
+            })
+	    });    
+           
+            
+           
+           
+           
+			window.addEventListener('resize', onWindowResize, false);
+		}
+
+		function onWindowResize() {
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+
+			renderer.setSize(window.innerWidth, window.innerHeight);
+		}
+        let startFlag = true;
+        let frameCount = 0;
+        let startTime = null;
+        let shouldLog = true;
+        let first = true;
+        renderer.compile(scene,camera);
+		function animate(t) {
+			requestAnimationFrame( animate );
+            // for(let i=0;i<models.length;i++) {
+            //     models[i].rotation.y += 0.01;
+            // } 
+       
+            // console.log(timestamp);
+            let time = performance.now();
+            stats.update(time);
+            
+			renderer.render(scene, camera);
+            if ( loaded){
+                if (startFlag) {
+                    startTime = time;
+                    startFlag = false;
+                    console.log('startTime',startTime,'duration',startTime-initTime);
+                }
+                frameCount += 1;
+                if(frameCount % 1000 === 0) {
+                    let fps = 1000 * frameCount / (time - startTime);
+                    console.log(frameCount,fps,'fps');
+                } 
+                if ((time - startTime) /1000 > 60 && shouldLog){
+                    shouldLog = false;
+                    let fps = 1000 * frameCount / (time - startTime);
+                    console.log('1min', (time - startTime)/1000, frameCount,fps,'fps');
+                }
+            }
+            
+          
+		}
+        window.requestAnimationFrame(animate);
+
+    }
+	</script>
+</body>
+
+</html>

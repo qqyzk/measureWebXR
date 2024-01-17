@@ -1,0 +1,103 @@
+<html>
+  <head>
+    <script src="./src/aframe.min.js"></script>
+    <script src="./src/jquery.min.js"></script>
+  </head>
+  <body>
+    <script>
+      let loaded=false;
+      AFRAME.registerComponent('measure-fps', {
+        schema: {
+            startFlag: {type: 'bool', default:true},
+            frameCount: {type: 'int', default: 0},
+            startTime: {type:'float', default: 0},
+            shouldLog: {type: 'bool', default: true}
+        },
+        init: function () {
+          this.data.startFlag = true;
+          this.data.frameCount = 0;
+          this.data.startTime = 0;
+          this.data.shouldLog = true;
+        },
+        tock: function () {
+          if (loaded){
+                let time = performance.now();
+                if (this.data.startFlag) {
+                    this.data.startTime = time;
+                    this.data.startFlag = false;
+                    console.log('startTime',this.data.startTime);
+                }
+                this.data.frameCount += 1;
+                if(this.data.frameCount % 1000 === 0) {
+                    let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
+                    console.log(this.data.frameCount,fps,'fps');
+                } 
+                if ((time - this.data.startTime) /1000 > 60 && this.data.shouldLog){
+                    this.data.shouldLog = false;
+                    let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
+                    console.log('1min', (time - this.data.startTime)/1000, this.data.frameCount,fps,'fps');
+                }
+            } else{
+              console.log('not loaded yet');
+            }
+        }
+      });
+      
+
+      AFRAME.registerComponent('multiobj', {
+          init: function(){
+            console.log('init',performance.now()); 
+            let name=$('#create-obj')[0].attributes.src.value.split('/')[2];
+            let scale;
+            if(name==='Box'){
+              scale=0.1;
+            }else if(name==='BoxTextured4'){
+              scale=0.1;
+            }else if (name==='BoomBox'){
+              scale=5;
+            }else if(name==='DamagedHelmet'){
+              scale=0.1;
+            }
+              let el = this.el;
+              let sceneEl = document.querySelector('a-scene');
+              el.addEventListener("model-loaded", e =>{    
+                  let minx=-0.8, miny = -1.8, minz = -10;
+                  let maxx=0.8,maxy=1.8,maxz=-3;
+                  let edgeNum=2;
+                  for(let i=0;i<edgeNum;++i){
+                    for(let j=0;j<edgeNum;++j){
+                        for(let k=0;k<edgeNum;++k){
+                            let curx = minx + (maxx-minx)/(edgeNum-1)*i;
+                            let cury = miny+ (maxy-miny)/(edgeNum-1)*j;
+                            let curz = minz + (maxz-minz)/(edgeNum-1)*k;
+                            let entity = document.createElement('a-entity'); // create the element
+                            entity.setAttribute('obj-model', {obj: '#create-obj', mtl: '#create-mtl'})
+                            entity.setAttribute('position',String(curx)+' '+String(cury) + ' '+ String(curz));
+                            entity.setAttribute('scale',String(scale)+' '+String(scale)+' '+String(scale));   
+                            entity.setAttribute('visible',"true");  
+                            // you can add event listeners here for interaction, such as mouse events.
+                            sceneEl.appendChild(entity);// Append the element to the scene, so it becomes part of the DOM.
+                            
+                        }
+                    }
+                  }
+                  console.log('scene loaded',performance.now());
+                  loaded=true;
+                }    
+                     
+            );
+          }
+      });
+    </script>
+   
+    <a-scene measure-fps>
+        <a-assets>
+          <a-asset-item id="create-obj" src="../obj/BoxTextured4/BoxTextured.obj"></a-asset-item>
+          <a-asset-item id="create-mtl" src="../obj/BoxTextured4/BoxTextured.mtl"></a-asset-item>
+        </a-assets>
+        <a-entity id="objmodel" obj-model="obj: #create-obj; mtl: #create-mtl" visible="false" multiobj></a-entity>
+        <!-- <a-entity id="objmodel" obj-model="obj: #create-obj; mtl: #create-mtl" visible="true" scale="0.01 0.01 0.01" position='0.5 0 0'></a-entity> -->
+      </a-scene>
+    
+  </body>
+</html>

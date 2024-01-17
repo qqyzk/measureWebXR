@@ -1,0 +1,82 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:root {
+  --category-color-transparent: #fff;
+  --category-color-purple: var(--purple-70);
+  --category-color-green: var(--green-60);
+  --category-color-orange: var(--orange-50);
+  --category-color-yellow: #ffe129; /* this yellow has more contrast than yellow-50 */
+  --category-color-lightblue: var(--blue-40);
+  --category-color-blue: var(--blue-60);
+  --category-color-brown: var(--orange-70);
+  --category-color-magenta: var(--magenta-60);
+  --category-color-red: var(--red-60);
+  --category-color-lightred: #a4000f9a; /* red-70 with 60 alpha */
+  --category-color-gray: var(--grey-40);
+  --category-color-grey: var(--grey-40);
+  --category-color-darkgray: var(--grey-50);
+  --category-color-darkgrey: var(--grey-50);
+}
+
+/**
+ * These classes should be used to create a small color swatch to describe a
+ * category. They should be used with the class `colored-square` that's defined
+ * in res/css/style.css.
+ * They're global css classes that can be used across the project.
+ */
+.category-color-transparent {
+  border-color: rgb(0 0 0 / 0.4);
+  background-color: var(--category-color-transparent);
+}
+
+.category-color-purple {
+  background-color: var(--category-color-purple);
+}
+
+.category-color-green {
+  background-color: var(--category-color-green);
+}
+
+.category-color-orange {
+  background-color: var(--category-color-orange);
+}
+
+.category-color-yellow {
+  background-color: var(--category-color-yellow);
+}
+
+.category-color-lightblue {
+  background-color: var(--category-color-lightblue);
+}
+
+.category-color-blue {
+  background-color: var(--category-color-blue);
+}
+
+.category-color-brown {
+  background-color: var(--category-color-brown);
+}
+
+.category-color-magenta {
+  background-color: var(--category-color-magenta);
+}
+
+.category-color-red {
+  background-color: var(--category-color-red);
+}
+
+.category-color-lightred {
+  background-color: var(--category-color-lightred);
+}
+
+.category-color-gray,
+.category-color-grey {
+  background-color: var(--category-color-grey);
+}
+
+.category-color-darkgray,
+.category-color-darkgrey {
+  background-color: var(--category-color-darkgrey);
+}

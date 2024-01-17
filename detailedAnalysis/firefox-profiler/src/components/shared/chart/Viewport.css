@@ -1,0 +1,71 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+.chartViewport {
+  position: relative;
+  overflow: hidden;
+  flex: 1;
+  margin-top: 0;
+}
+
+.chartViewport.expanded {
+  border-top: 1px solid var(--grey-30);
+  border-bottom: 1px solid var(--grey-30);
+  margin-bottom: 5px;
+  cursor: grab;
+}
+
+.chartViewport.expanded::after {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+
+  /* Slight blue shadow. */
+  box-shadow: inset 0 0 20px rgb(64 115 140 / 0.2);
+  content: '';
+  pointer-events: none;
+}
+
+.chartViewport.dragging {
+  cursor: grabbing;
+}
+
+.chartViewportScroll {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  overflow: hidden;
+  padding: 3px 10px;
+  border-radius: 0 5px 0 0;
+  background: rgb(0 0 0 / 0.07);
+  box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.1), 0 2px 4px rgb(0 0 0 / 0.1);
+  line-height: 20px;
+  opacity: 1;
+  pointer-events: none;
+  text-overflow: ellipsis;
+  transition: transform 0.2s ease-in-out, opacity 0.2s ease-in-out;
+  white-space: nowrap;
+  will-change: opacity, transform;
+}
+
+.chartViewportScroll.hidden {
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.chartViewportScrollKbd {
+  position: relative;
+  top: -1px;
+  display: inline-block;
+  padding: 0 0.5em;
+  border: 1px solid #ccc;
+  border-radius: 0.2em;
+  margin: 0 0.2em;
+  background-color: #f6f6f6;
+  box-shadow: -0.1em 0.1em 0 #bbb;
+  color: #000;
+}

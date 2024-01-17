@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>My first babylon.js app</title>
+		<style>
+			body { margin: 0; }
+		</style>
+        <script src="./src/babylon.js"></script>
+        <script src="./src/babylon.glTFFileLoader.js"></script>
+	</head>
+	<body>
+        <canvas id="renderCanvas"></canvas>
+        <input  id="button" type="button" value="start" > 
+		<script>
+            var btn = document.getElementById("button");  
+            btn.onclick = function conduct(){
+                console.log('click time',performance.now());
+                    let loaded=false;
+            let name='Box';
+            let type='gltf';
+            let N=2;
+            // get the canvas DOM element
+            var canvas = document.getElementById('renderCanvas');
+            canvas.width=window.innerWidth;
+            canvas.height=window.innerHeight;
+            // Load the 3D engine
+            var engine = new BABYLON.Engine(canvas, {antialias:true,adaptToDeviceRatio:true});
+            // CreateScene function that creates and return the scene
+            var createScene = function(){
+                // Create a basic BJS Scene object
+                var scene = new BABYLON.Scene(engine);
+                scene.createDefaultCameraOrLight(true, true, true);
+                scene.activeCamera.alpha += Math.PI;
+                let minx=-0.5, miny=-1.1, minz=-10;
+                let maxx=0.5, maxy=1.1, maxz = -2;
+                let edgeNum=N;
+                let scale;
+                if(name==='Box' && type==='gltf'){
+                    url='../gltf/Box/Box.gltf';
+                    scale=0.05;
+                }else if(name==='Box' && type==='glb'){
+                    url='../gltf/Box/Box.glb';
+                    scale=0.05;
+                }else if(name==='BoxTextured' && type==='gltf'){
+                    url='../gltf/BoxTextured4/BoxTextured.gltf';
+                    scale=0.05;
+                }else if(name==='BoxTextured' && type==='glb'){
+                    url='../gltf/BoxTextured/BoxTextured.glb';
+                    scale=0.05;
+                }else if(name==='BoomBox' && type==='gltf'){
+                    url='../gltf/BoomBox/BoomBox.gltf';
+                    scale=5;
+                }else if(name==='BoomBox' && type==='glb'){
+                    url='../gltf/BoomBox/BoomBox.glb';
+                    scale=5;
+                }else if(name==='DamagedHelmet' && type==='gltf'){
+                    url='../gltf/DamagedHelmet/DamagedHelmet.gltf';
+                    scale=0.05;
+                }else if(name==='DamagedHelmet' && type==='glb'){
+                    url='../gltf/DamagedHelmet/DamagedHelmet.glb';
+                    scale=0.05;
+                }
+                BABYLON.SceneLoader.LoadAssetContainer(url,"",scene,
+                    (assets) => { 
+                    for(let i=0;i<edgeNum;++i){
+                        for(let j=0;j<edgeNum;++j){
+                            for(let k=0;k<edgeNum;++k){   
+                                let curx = minx + (maxx-minx)/(edgeNum-1)*i;
+                                let cury = miny+ (maxy-miny)/(edgeNum-1)*j;
+                                let curz = minz + (maxz-minz)/(edgeNum-1)*k;
+                                if(i==0 && k ==0 && j == 0){
+                                    assets.meshes[0].scaling = new BABYLON.Vector3(scale,scale,-1*scale);
+                                    assets.meshes[0].position = new BABYLON.Vector3(curx,cury,curz);
+                                } else{
+                                    let mesh= assets.meshes[0].clone();
+                                    mesh.scaling = new BABYLON.Vector3(scale,scale,-1*scale); 
+                                    mesh.position = new BABYLON.Vector3(curx,cury,curz);
+                                    assets.meshes.push(mesh);
+                                }
+                              
+                            }
+                        }
+                    }   
+                    assets.addAllToScene();
+                    loaded=true;
+                    console.log('scene loaded time',performance.now());
+                    
+                });
+                    
+        
+                return scene;
+            }
+            // call the createScene function
+            var scene = createScene();
+            let startFlag = true;
+            let frameCount = 0;
+            let startTime = null;
+            let shouldLog = true;
+            // run the render loop
+            // Register and execute a render loop. The engine can have more than one render function
+            engine.runRenderLoop(function(){
+                // Render the scene
+                scene.render();
+                // console.log('hi');
+                if (loaded){
+                    
+                    let time = performance.now();
+                    if (startFlag) {
+                        startTime = time;
+                        startFlag = false;
+                        console.log('startTime',startTime);
+                    }
+                    frameCount += 1;
+                    if(frameCount % 1000 === 0) {
+                        let fps = 1000 * frameCount / (time - startTime);
+                        console.log(frameCount,fps,'fps');
+                    } 
+                    if ((time - startTime) /1000 > 60 && shouldLog){
+                        shouldLog = false;
+                        let fps = 1000 * frameCount / (time - startTime);
+                        console.log('1min', (time - startTime)/1000, frameCount,fps,'fps');
+                    }
+                }
+            });
+            // the canvas/window resize event handler
+            window.addEventListener('resize', function(){
+                engine.resize();
+               
+            });
+        }
+		</script>
+	</body>
+</html>

@@ -1,0 +1,176 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+.filterNavigatorBar {
+  --internal-selected-color: var(--selected-color, var(--blue-60));
+
+  display: flex;
+  height: 24px;
+  flex-flow: row nowrap;
+  flex-shrink: 0;
+  padding: 0;
+  margin: 0;
+  cursor: default;
+  user-select: none;
+
+  /* Note: no overflow: hidden so that we can see the exit animation for ranges */
+}
+
+.filterNavigatorBarItem {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  height: 24px;
+  flex-flow: row nowrap;
+  padding: 0 6px 0 8px;
+  border: solid transparent;
+  border-width: 0 8px 0 6px;
+  border-right-color: transparent !important;
+  background-clip: padding-box;
+  line-height: 24px;
+  transition: opacity 250ms var(--animation-curve),
+    transform 250ms var(--animation-curve);
+}
+
+.filterNavigatorBarRootItem {
+  max-width: 100%;
+  flex-shrink: 0;
+  margin-left: -8px;
+}
+
+.filterNavigatorBarItemContent {
+  display: flex;
+  overflow: hidden;
+
+  /* These lines are mostly to override the default browser styles for `<button>`.
+   * The 8px are used by the box-shadow when the button receives focus */
+  padding: 0;
+  border: none;
+  margin: auto;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filterNavigatorBarItemContent > .nodeIcon {
+  margin-inline-end: 5px;
+}
+
+.filterNavigatorBarItem::before,
+.filterNavigatorBarItem::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: block;
+  width: 0;
+  border: 12px solid transparent;
+  border-right-width: 2px;
+  content: '';
+  pointer-events: none;
+}
+
+.filterNavigatorBarItem::before {
+  left: -14px;
+  border-left-color: transparent !important;
+}
+
+.filterNavigatorBarItem::after {
+  right: -14px;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-bottom-color: transparent !important;
+}
+
+.filterNavigatorBarItem:not(.filterNavigatorBarLeafItem)::after {
+  animation: fadeIn 250ms var(--animation-curve);
+  background-image: url(../../../res/img/svg/scope-bar-separator.svg);
+  background-position: -18px -12px;
+  background-repeat: no-repeat;
+  background-size: 24px 24px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.filterNavigatorBarSelectedItem {
+  color: var(--internal-selected-color);
+}
+
+.filterNavigatorBarItem:not(.filterNavigatorBarLeafItem):hover {
+  background-color: rgb(0 0 0 / 0.1);
+}
+
+.filterNavigatorBarItem:not(
+    .filterNavigatorBarRootItem,
+    .filterNavigatorBarLeafItem
+  ):hover::before,
+.filterNavigatorBarItem:not(.filterNavigatorBarLeafItem):hover::after {
+  border-color: rgb(0 0 0 / 0.1);
+}
+
+.filterNavigatorBarItem:not(.filterNavigatorBarLeafItem):active:hover {
+  background-color: rgb(0 0 0 / 0.2);
+}
+
+.filterNavigatorBarItem:not(
+    .filterNavigatorBarRootItem,
+    .filterNavigatorBarLeafItem
+  ):active:hover::before,
+.filterNavigatorBarItem:not(.filterNavigatorBarLeafItem):active:hover::after {
+  border-color: rgb(0 0 0 / 0.2);
+}
+
+.filterNavigatorBarUncommittedItem {
+  opacity: 0.65;
+}
+
+/* Animation */
+
+.filterNavigatorBarUncommittedTransition-exit {
+  /* Because of the underlying transition library, this element is still here
+   * while the new "committed" element is created, which pushes it further
+   * right. By using display: none here, we prevent this bad effect. */
+  display: none;
+}
+
+.filterNavigatorBarTransition-enter {
+  color: inherit;
+
+  /* We use the same value as the uncommitted item.
+   * Note that the "uncommitted item" won't have this "enter" class when
+   * committing, because of how we insert it (it's not part of the same loop). */
+  opacity: 0.65;
+}
+
+.filterNavigatorBarTransition-enter.filterNavigatorBarTransition-enter-active {
+  color: var(--internal-selected-color);
+  opacity: 1;
+}
+
+.filterNavigatorBarTransition-exit {
+  opacity: 1;
+}
+
+.filterNavigatorBarTransition-exit.filterNavigatorBarTransition-exit-active {
+  opacity: 0;
+  transform: translateX(50%);
+}
+
+/* Do not animate the filter navigator bar items when user prefers reduced motion */
+@media (prefers-reduced-motion) {
+  .filterNavigatorBarItem {
+    animation: none;
+    transition: none;
+  }
+}

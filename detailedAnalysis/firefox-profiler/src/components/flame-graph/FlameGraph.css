@@ -1,0 +1,17 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+.flameGraph {
+  display: flex;
+  overflow: hidden;
+  flex: 1;
+  flex-flow: column;
+}
+
+.flameGraphContent {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  border-top: 1px solid var(--grey-30);
+}

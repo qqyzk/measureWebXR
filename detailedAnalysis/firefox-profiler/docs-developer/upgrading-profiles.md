@@ -1,0 +1,80 @@
+# Profile expiration and upgrading profiles
+
+## Profile expiration
+
+The Firefox Profiler is committed to maintaining support for loading profiles for at least 3 years. After this time, we do not guarantee profile upgrading support, nor that profiles will still be available in the online profile storage. Older profiles can still be viewed and upgraded locally by checking out an older version of this project, running `yarn install` and `yarn start`, and following the getting started documentation for that checkout.
+
+## Profile upgrading TL;DR
+
+Changes to the profile format need to happen in this order:
+
+ 1. The format change needs to be proposed and agreed upon.
+ 2. [profiler.firefox.com] needs to be updated to be able to deal with that new format, and an upgrader from the current format to the new format needs to be added.
+ 3. Usually there needs to be a corresponding change to the "processed profile" format, which is used in [profiler.firefox.com] internally. If that's the case, the processed profile format version needs to be incremented, an upgrader for old processed profiles needs to be added, and processProfile needs to be changed to output the new version of the processed profile format.
+ 4. Once the [profiler.firefox.com] update is rolled out, the actual Firefox change can land.
+
+## Background on upgrading
+
+Firefox generates profiles in a function called `StreamJSON` in [tools/profiler/core/platform.cpp](http://searchfox.org/mozilla-central/rev/7cb75d87753de9103253e34bc85592e26378f506/tools/profiler/core/platform.cpp#1259). This code is the authorative "description" of the current profile format.
+
+Sometimes the profile format changes. Maybe we want to add new information that wasn't there before, or maybe we found a better way to represent existing information.
+
+When this happens, [profiler.firefox.com] needs to be updated to handle the new format. However, we want [profiler.firefox.com] to be compatible with any Firefox version, for example the latest version of [profiler.firefox.com] should still work in Firefox Release while the profile format change slowly propagates from Nightly up the channels.
+
+Rather than enforcing profile format changes to be purely additive, or carefully guarding all parts of profile parsing in [profiler.firefox.com] with appropriate checks, we have opted for the following policy:
+
+**Every change to the profile format needs to come with a change to the profile version number, and is treated as a "breaking" change.**
+
+The profile version number is stored in `profile.meta.version`, and is an integer.
+
+When [profiler.firefox.com] receives a profile, as a first step it will run it through an upgrade process: If the profile is in a format version that's older than the most recent version known to it, a number of "upgrader" functions get applied to it, and at the end of that process the result can be treated as a profile of the most recent version. This way, most of the client's code can pretend that it only receives up-to-date profiles, and the compatibility concerns are constrained to a dedicated file.
+
+This dedicated file is [gecko-profile-versioning.js](../src/profile-logic/gecko-profile-versioning.js). It hosts the upgrader functions. These upgrader functions are also a great place to document format changes.
+
+### No forwards compatibility
+
+The setup described above only solves one direction of compatibility: You can run current versions of [profiler.firefox.com] in old versions of Firefox. It does not address the other direction, running old versions of [profiler.firefox.com] on newer versions of Firefox. For now, if the app encounters profiles that are newer than what it understands, it will blindly reject the profile and show an error message, asking the user to refresh the page in order to load a newer version which will hopefully know how to deal with the profile. If a new version is detected it will try to reload automatically.
+
+That means that profile format changes need to be made in this order:
+
+ 1. The format change needs to be proposed and agreed upon.
+ 2. [profiler.firefox.com] needs to be updated to be able to deal with that new format, and an upgrader from the current format to the new format needs to be added to it.
+ 3. *After* the [profiler.firefox.com] update is rolled out, the actual Firefox change can land.
+
+We'll see how this works out. It might be annoying for users who have updated their Firefox Nightly but not opened up [profiler.firefox.com] between (2) and (3), and then try to load a new profile into an old version of [profiler.firefox.com] from their service worker cache. They're only one page refresh away from success, though.
+
+If this turns out to be too hard to deal with, we might need to go with a semver approach and hope that most profile changes are non-breaking. Time will tell.
+
+### The processed profile format
+
+Up to here we've only talked about the profile format that is generated by Gecko, and which the [profiler.firefox.com] client code generally calls the "Gecko profile format".
+
+However, the Gecko profile format is not what [profiler.firefox.com] uses to represent profiles internally. Instead, when it receives a Gecko profile, it runs it through a processing step, and calls the output of that process the "processed profile". Processed profiles are also what gets uploaded to the profile store when you click the "Share" button, or what you get when you download a profile. See [gecko-profile-format.md](gecko-profile-format.md) for more information about this.
+
+We want to be able to display profiles that were saved at any point in the past.
+
+Consequently, the same versioning concerns as for the Gecko profile format also apply to the processed profile format.
+
+The processed profile version is stored in the field `profile.meta.preprocessedProfileVersion`, and the upgraders for processed profiles live in the file [processed-profile-versioning.js](../src/profile-logic/processed-profile-versioning.js).
+
+`processProfile` should output the latest version of the processed profile format at all times. Combined with the fact that it can treat its input as being a Gecko profile of the latest Gecko profile format version, this keeps `processProfile` uncomplicated.
+
+## Summary
+
+When the Gecko profile format changes (due to a change in Gecko):
+
+ - The version number (`profile.meta.version`) needs to be incremented in Gecko.
+ - In [app-logic/constants.js](../src/app-logic/constants.js), `GECKO_PROFILE_VERSION` needs to be set to that new version number, and a conversion function from the old to the new version needs to be added to `_updaters`.
+ - Profile processing may need to be adjusted to parse the new Gecko profile format version.
+
+When the processed profile format changes (e.g. because a different data format seems adequate, or because new data from the Gecko profile needs to be accommodated):
+
+ - `processProfile` needs to be changed to output the new format.
+ - In [app-logic/constants.js](../src/app-logic/constants.js), `PROCESSED_PROFILE_VERSION` needs to be incremented and an update function needs to be added to `_updaters`.
+
+At all times, `processProfile` only has code that converts the latest version
+of the Gecko profile format into the latest version of the processed profile
+format. All compatibility code is hosted outside of process-profile.js, in
+the respective `*-profile-versioning.js` file.
+
+[profiler.firefox.com]: https://profiler.firefox.com

@@ -1,0 +1,47 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+.idleSearchField {
+  position: relative; /* to properly position the button */
+  display: inline-flex;
+  flex-flow: row nowrap;
+  align-items: center;
+}
+
+.photon-input.idleSearchFieldInput {
+  /* the chain class selectors are used here 
+  to override the styling for the photon-input class */
+  height: 19px;
+  padding: 0 18px 0 17px; /* right padding for the reset button, left padding for the search icon */
+  border: 0.5px solid #aaa;
+}
+
+.idleSearchFieldInput {
+  position: relative;
+  flex: 1;
+  margin: 0;
+  background: url(../../../res/img/svg/searchfield-icon.svg) 3px center
+    no-repeat white;
+  background-size: 11px 11px;
+}
+
+.idleSearchFieldButton {
+  position: absolute;
+  right: 5px;
+  overflow: hidden;
+  width: 11px;
+  height: 11px;
+  padding: 0;
+  border: 0;
+  background: url(../../../res/img/svg/searchfield-cancel.svg) top left
+    no-repeat;
+  background-size: contain;
+  color: transparent;
+  -moz-user-focus: ignore;
+  vertical-align: middle;
+}
+
+.idleSearchFieldInput:invalid + .idleSearchFieldButton {
+  visibility: hidden;
+}

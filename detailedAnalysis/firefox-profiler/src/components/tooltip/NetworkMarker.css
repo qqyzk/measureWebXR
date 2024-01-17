@@ -1,0 +1,53 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+.tooltipNetwork {
+  width: 600px;
+}
+
+.tooltipNetworkPhases {
+  display: grid;
+  padding-top: 4px;
+  border-top: 1px solid var(--grey-40);
+  margin-top: 4px;
+  grid-gap: 2px 5px;
+
+  /* When changing the number of columns, don't forget to change the span values
+   * in grid-column-start properties. */
+  grid-template-columns: min-content min-content auto;
+}
+
+.tooltipNetworkTitle3 {
+  /* Reset most default properties of h3. */
+  padding: 0;
+  margin: 5px 0 3px;
+  font: inherit;
+
+  /* Make the title take the 2 columns. */
+  grid-column-start: span 3;
+}
+
+.tooltipNetworkTitle3:first-child {
+  margin-top: 3px;
+}
+
+.tooltipNetworkPhase {
+  margin: 2px 0;
+  background-color: var(--marker-color);
+}
+
+.tooltipNetworkPhaseEmpty {
+  background-color: white;
+  box-shadow: 0 0 0 1px inset var(--marker-color);
+  opacity: 0.5;
+}
+
+.tooltipNetworkMimeType {
+  display: flex;
+  align-items: center;
+}
+
+.tooltipNetworkMimeTypeSwatch {
+  background-color: var(--marker-color);
+}

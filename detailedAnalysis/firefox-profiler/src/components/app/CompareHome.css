@@ -1,0 +1,38 @@
+.compareHome {
+  /* Position */
+  width: 75%;
+
+  /* Box */
+  padding: 8em;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  margin: auto;
+
+  /* Other */
+  background: #fff;
+  box-shadow: 0 5px 25px #0b1f50;
+  font-size: 130%;
+}
+
+.compareHomeForm {
+  display: grid;
+  align-items: center;
+  grid-gap: 1em;
+  grid-template-columns: auto 1fr;
+}
+
+.compareHomeSubmitButton {
+  font-size: inherit; /* override the photon style to make it nicer with the rest of the form. */
+  grid-column-start: span 2;
+}
+
+.compareHomeFormLabel {
+  white-space: nowrap;
+}
+
+@media (max-width: 450px) {
+  .compareHome {
+    width: auto;
+    padding: 1em;
+  }
+}

@@ -1,0 +1,32 @@
+.backtrace {
+  padding: 0;
+  margin: 0;
+}
+
+.tooltip .backtrace {
+  overflow: hidden;
+}
+
+.backtraceStackFrame {
+  /* Position */
+  overflow: hidden;
+
+  /* Box */
+  padding: 0;
+  margin: 0;
+  list-style: none;
+
+  /* Other */
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.backtraceStackFrameOrigin {
+  margin-left: 10px;
+  color: rgb(0 0 0 / 0.55);
+  font-style: normal;
+}
+
+.backtraceStackFrame_isFrameLabel {
+  color: rgb(0 0 0 / 0.6);
+}

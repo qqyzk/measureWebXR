@@ -1,0 +1,162 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+.timelineSelection {
+  --thread-label-column-width: 150px;
+  --vertical-scrollbar-reserved-width: 15px;
+  --content-width: calc(
+    100vw - var(--thread-label-column-width) -
+      var(--vertical-scrollbar-reserved-width)
+  );
+
+  position: relative;
+  display: flex;
+  width: var(--content-width);
+  flex: 1;
+  flex-direction: column;
+  margin-left: var(--thread-label-column-width);
+  -moz-user-focus: ignore;
+}
+
+.timelineSelectionHoverLine {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  display: none;
+  width: 1px;
+  background: rgb(0 0 0 / 0.4);
+  pointer-events: none;
+}
+
+.timelineSelection:hover > .timelineSelectionHoverLine {
+  display: block;
+}
+
+.timelineSelectionOverlay {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  overflow: hidden;
+  flex-flow: row nowrap;
+  padding-left: 5px;
+  margin-left: -5px;
+  pointer-events: none;
+}
+
+.timelineSelectionDimmerBefore,
+.timelineSelectionDimmerAfter {
+  flex-shrink: 0;
+  background: rgb(12 12 13 / 0.1);
+}
+
+.timelineSelectionDimmerAfter {
+  flex: 1;
+}
+
+.timelineSelectionOverlayWrapper {
+  display: flex;
+  flex-flow: column nowrap;
+}
+
+.timelineSelectionGrippy {
+  display: flex;
+  height: 20px;
+  flex-flow: row nowrap;
+  pointer-events: auto;
+}
+
+.timelineSelectionGrippyRangeStart,
+.timelineSelectionGrippyRangeEnd {
+  position: relative;
+  z-index: 3;
+  width: 0;
+  padding: 3px;
+  border: 1px solid white;
+  border-radius: 5px;
+  margin: 0 -4px;
+  background: #aaa;
+  cursor: ew-resize;
+}
+
+.timelineSelectionGrippyRangeStart:hover,
+.timelineSelectionGrippyRangeStart.dragging,
+.timelineSelectionGrippyRangeEnd:hover,
+.timelineSelectionGrippyRangeEnd.dragging {
+  background: #888;
+}
+
+.timelineSelectionGrippyMoveRange {
+  flex: 1;
+  cursor: grab;
+}
+
+.timelineSelectionGrippyMoveRange.dragging {
+  cursor: grabbing;
+}
+
+.timelineSelectionOverlayInner {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+}
+
+.timelineSelectionOverlayRange {
+  position: absolute;
+  top: 20px;
+  padding: 4px 8px;
+  border-radius: 0 0 4px 4px;
+  background-color: var(--blue-50);
+  box-shadow: 0 2px 2px rgb(0 0 0 / 0.2);
+  color: #fff;
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity 200ms;
+}
+
+.timelineSelectionOverlayRange.hidden {
+  opacity: 0;
+}
+
+.timelineSelectionOverlayZoomButton {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  box-sizing: border-box;
+  border: 1px solid rgb(0 0 0 / 0.2);
+  border-radius: 100%;
+  margin: -15px;
+  background: url(../../../res/img/svg/zoom-icon.svg) center center no-repeat
+    rgb(255 255 255 / 0.6);
+  opacity: 0.5;
+  pointer-events: auto;
+  transition: opacity 200ms ease-in-out;
+  will-change: opacity;
+}
+
+.timelineSelectionOverlayZoomButton.hidden {
+  opacity: 0 !important;
+  pointer-events: none;
+  transition: unset;
+}
+
+.timelineSelectionOverlayZoomButton:hover {
+  background-color: rgb(255 255 255 / 0.9);
+}
+
+.timelineSelectionOverlayZoomButton:active,
+.timelineSelection:hover .timelineSelectionOverlayZoomButton {
+  opacity: 1;
+}
+
+.timelineSelectionOverlayZoomButton:active:hover {
+  background-color: rgb(160 160 160 / 0.6);
+}

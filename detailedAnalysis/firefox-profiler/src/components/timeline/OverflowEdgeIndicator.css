@@ -1,0 +1,96 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+.overflowEdgeIndicator {
+  position: relative;
+  display: flex;
+  width: calc(100% + var(--vertical-scrollbar-reserved-width));
+  flex: 1;
+  flex-direction: column;
+}
+
+.overflowEdgeIndicatorEdge {
+  position: absolute;
+  z-index: 3;
+  opacity: 0;
+  pointer-events: none;
+  transition: 150ms ease-in-out;
+  transition-property: opacity, visibility;
+  visibility: hidden;
+}
+
+.overflowEdgeIndicatorEdge.topEdge,
+.overflowEdgeIndicatorEdge.leftEdge,
+.overflowEdgeIndicatorEdge.bottomEdge {
+  left: 0;
+}
+
+.overflowEdgeIndicatorEdge.topEdge,
+.overflowEdgeIndicatorEdge.rightEdge,
+.overflowEdgeIndicatorEdge.bottomEdge {
+  right: 0;
+}
+
+.overflowEdgeIndicatorEdge.topEdge,
+.overflowEdgeIndicatorEdge.leftEdge,
+.overflowEdgeIndicatorEdge.rightEdge {
+  top: 0;
+}
+
+.overflowEdgeIndicatorEdge.leftEdge,
+.overflowEdgeIndicatorEdge.rightEdge,
+.overflowEdgeIndicatorEdge.bottomEdge {
+  bottom: 0;
+}
+
+.overflowEdgeIndicatorEdge.leftEdge,
+.overflowEdgeIndicatorEdge.rightEdge {
+  width: 15px;
+}
+
+.overflowEdgeIndicatorEdge.topEdge,
+.overflowEdgeIndicatorEdge.bottomEdge {
+  height: 15px;
+}
+
+.overflowEdgeIndicatorEdge.topEdge {
+  background: radial-gradient(
+    ellipse at center top,
+    rgb(0 0 0 / 0.4),
+    transparent 60%
+  );
+}
+
+.overflowEdgeIndicatorEdge.rightEdge {
+  background: radial-gradient(
+    ellipse at right center,
+    rgb(0 0 0 / 0.4),
+    transparent 60%
+  );
+}
+
+.overflowEdgeIndicatorEdge.bottomEdge {
+  background: radial-gradient(
+    ellipse at center bottom,
+    rgb(0 0 0 / 0.4),
+    transparent 60%
+  );
+}
+
+.overflowEdgeIndicatorEdge.leftEdge {
+  background: radial-gradient(
+    ellipse at left center,
+    rgb(0 0 0 / 0.4),
+    transparent 60%
+  );
+}
+
+.overflowEdgeIndicator.overflowsOnTop > .overflowEdgeIndicatorEdge.topEdge,
+.overflowEdgeIndicator.overflowsOnRight > .overflowEdgeIndicatorEdge.rightEdge,
+.overflowEdgeIndicator.overflowsOnBottom
+  > .overflowEdgeIndicatorEdge.bottomEdge,
+.overflowEdgeIndicator.overflowsOnLeft > .overflowEdgeIndicatorEdge.leftEdge {
+  opacity: 1;
+  visibility: visible;
+}

@@ -1,0 +1,21 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+.timelineTrackThread {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  flex-flow: column nowrap;
+}
+
+.timelineTrackThreadBlank {
+  /* Clip off the border to the left, by overflowing by one pixel. */
+  position: relative;
+  left: -1px;
+  width: 100%;
+  height: var(--timeline-track-thread-blank-height);
+  padding-left: 1px;
+  background-color: #fff;
+}

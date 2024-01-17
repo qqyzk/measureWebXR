@@ -1,0 +1,180 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+.rootMessageContainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.rootMessage {
+  overflow: hidden;
+  width: 80%;
+  max-width: 600px;
+  box-sizing: border-box;
+  padding: 3em;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background-color: #fff;
+  box-shadow: 0 5px 25px #0b1f50;
+  font-size: 130%;
+}
+
+.rootMessageText,
+.rootMessageAdditional,
+.rootBackHomeLink {
+  line-height: 1.5;
+}
+
+.rootMessageTitle {
+  margin-top: 0;
+}
+
+.rootMessageAdditional {
+  padding-top: 1em;
+  border-top: 1px solid #ccc;
+  margin-top: 1em;
+  font-size: 12px;
+}
+
+.loading {
+  position: relative;
+  height: 40px;
+  margin-top: 10px;
+}
+
+.loading-div {
+  position: absolute;
+  height: 8px;
+  border-radius: 2px;
+  animation-duration: 4000ms;
+  animation-iteration-count: infinite;
+  animation-name: loadingdiv;
+}
+
+.loading-row-1 {
+  top: 0;
+}
+
+.loading-row-2 {
+  top: 10px;
+}
+
+.loading-row-3 {
+  top: 20px;
+}
+
+.loading-row-4 {
+  top: 30px;
+}
+
+.loading-div-1 {
+  width: 100%;
+  animation-delay: -900ms;
+  background-color: var(--red-50);
+}
+
+.loading-div-2 {
+  left: 1%;
+  width: 97%;
+  animation-delay: -800ms;
+  background-color: var(--blue-50);
+}
+
+.loading-div-3 {
+  left: 5%;
+  width: 30%;
+  animation-delay: -700ms;
+  background-color: var(--orange-50);
+}
+
+.loading-div-4 {
+  left: 43%;
+  width: 53%;
+  animation-delay: -600ms;
+  background-color: var(--purple-50);
+}
+
+.loading-div-5 {
+  left: 8%;
+  width: 14%;
+  animation-delay: -500ms;
+  background-color: var(--purple-50);
+}
+
+.loading-div-6 {
+  left: 23%;
+  width: 11%;
+  animation-delay: -400ms;
+  background-color: var(--green-50);
+}
+
+.loading-div-7 {
+  left: 44%;
+  width: 15%;
+  animation-delay: -300ms;
+  background-color: var(--orange-50);
+}
+
+.loading-div-8 {
+  left: 60%;
+  width: 17%;
+  animation-delay: -200ms;
+  background-color: var(--orange-50);
+}
+
+.loading-div-9 {
+  left: 78%;
+  width: 2%;
+  animation-delay: -100ms;
+  background-color: var(--blue-50);
+}
+
+.loading-div-10 {
+  left: 81%;
+  width: 11%;
+  animation-delay: 0ms;
+  background-color: var(--green-60);
+}
+
+@keyframes loadingdiv {
+  0% {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+
+  20% {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+
+  45% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  65% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(-100px);
+  }
+}
+
+/* Do not animate the loading animation when user prefers reduced motion. The
+ * other alternative was to remove these boxes completely, but it's still nice
+ * to keep the boxes as a nice visualization. */
+@media (prefers-reduced-motion) {
+  .loading-div {
+    animation: none;
+  }
+}

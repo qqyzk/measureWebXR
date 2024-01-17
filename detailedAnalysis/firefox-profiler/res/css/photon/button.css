@@ -1,0 +1,93 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* See https://design.firefox.com/photon/components/buttons.html for the spec */
+.photon-button {
+  padding: 0 8px;
+  border: none;
+  border-radius: 2px;
+  margin: 0;
+
+  /* reset default styles */
+  background: none;
+
+  /* photon styles */
+  background-color: var(--grey-90-a10);
+  color: var(--grey-90);
+  font: inherit;
+}
+
+/* This is a Firefox-specific style because Firefox adds a focusring at a bad
+ * position. We're adding our own below. */
+.photon-button::-moz-focus-inner {
+  border: none;
+}
+
+.photon-button:disabled {
+  opacity: 0.4;
+}
+
+/* Note: we're using :not(:disabled) instead of :enabled so that this can apply
+ * to non-input elements too. */
+.photon-button:hover:not(:disabled) {
+  background-color: var(--grey-90-a20);
+}
+
+.photon-button:hover:active:not(:disabled) {
+  background-color: var(--grey-90-a30);
+}
+
+.photon-button-primary,
+.photon-button-destructive,
+.photon-button-default {
+  min-width: 132px;
+  height: 32px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+
+.photon-button-primary {
+  background-color: var(--blue-60);
+  color: #fff;
+}
+
+.photon-button-primary:hover:not(:disabled) {
+  background-color: var(--blue-70);
+}
+
+.photon-button-primary:hover:active:not(:disabled) {
+  background-color: var(--blue-80);
+}
+
+/* Use this class for destructive actions only. */
+.photon-button-destructive {
+  background-color: var(--red-60);
+  color: #fff;
+}
+
+.photon-button-destructive:hover:not(:disabled) {
+  background-color: var(--red-70);
+}
+
+.photon-button-destructive:hover:active:not(:disabled) {
+  background-color: var(--red-80);
+}
+
+.photon-button-ghost {
+  width: 32px;
+  height: 32px;
+  background-color: transparent;
+}
+
+.photon-button-ghost:hover:not(:disabled) {
+  background-color: var(--grey-90-a10);
+}
+
+.photon-button-ghost:hover:active:not(:disabled) {
+  background-color: var(--grey-90-a20);
+}
+
+.photon-button-micro {
+  height: 24px;
+}

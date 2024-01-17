@@ -1,0 +1,108 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+.timelineOverflowEdgeIndicatorScrollbox {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  padding-left: var(--thread-label-column-width);
+  margin-right: calc(var(--vertical-scrollbar-reserved-width) * -1);
+  margin-left: calc(var(--thread-label-column-width) * -1);
+  background: linear-gradient(
+    to left,
+    white,
+    #eee calc(var(--vertical-scrollbar-reserved-width) - 1px),
+    var(--grey-30) 0,
+    var(--grey-30) var(--vertical-scrollbar-reserved-width),
+    transparent 0
+  );
+  overflow-x: hidden; /* if the platform scrollbar ends up being larger than --vertical-scrollbar-reserved-width (which is unexpected), make sure there is no horizontal scrollbar */
+  overflow-y: auto;
+}
+
+.timelineThreadList {
+  width: calc(100vw - var(--vertical-scrollbar-reserved-width));
+  padding: 0;
+  margin: 0 0 0 calc(var(--thread-label-column-width) * -1);
+  background-color: var(--grey-20);
+  box-shadow: inset 0 1px var(--grey-30);
+  list-style: none;
+}
+
+.timelineSettingsHiddenTracks {
+  /* Make sure and override all rules that have to do with button defaults. */
+  position: relative;
+  width: var(--thread-label-column-width);
+
+  /* 8px is intentional to align this text with the text above. */
+  padding: 0 20px 0 8px;
+  border: 0;
+
+  /* Separator line between tracks menu button and timeline ruler */
+  border-right: 1px solid var(--grey-30);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.timelineSettingsHiddenTracks:hover {
+  background-color: rgb(0 0 0 / 0.1);
+}
+
+.timelineSettingsHiddenTracks:hover:active {
+  background-color: rgb(0 0 0 / 0.2);
+}
+
+/* This is the dropdown arrow on the left of the button. */
+.timelineSettingsHiddenTracks::before {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  border-top: 6px solid;
+  border-right: 4px solid transparent;
+  border-bottom: 0 solid transparent;
+  border-left: 4px solid transparent;
+  margin-top: 5px;
+  margin-right: 5px;
+  margin-left: 5px;
+  color: var(--grey-60);
+  content: '';
+}
+
+.timelineSettingsHiddenTracksNumber {
+  font-weight: bold;
+}
+
+.timelineHeader {
+  /* This should be on top of the overflow edge indicator that wraps the thread
+   list, so border bottom will always be visible. */
+  z-index: 1;
+  display: flex;
+  height: 20px;
+  flex-direction: row;
+
+  /* Timeline header content should end before the scrollbar but also border
+   * bottom should extend to the whole timeline header. Because of that, we are
+   * creating a padding and a minus margin with the scrollbar width to make
+   * this work. */
+  padding-right: var(--vertical-scrollbar-reserved-width);
+  border-bottom: 1px solid var(--grey-30);
+  margin-right: calc(var(--vertical-scrollbar-reserved-width) * -1);
+  margin-left: calc(var(--thread-label-column-width) * -1);
+
+  /* This div needs to be apaque so that it can properly hide the hidden tracks
+   * container border below */
+  background: white;
+}
+
+.tracksContainer {
+  /* This should be below the timeline header. */
+  z-index: 0;
+
+  /* Moving the timeline 1 pixel below the timeline header. This way, the first
+   * visible track's top border will be hidden as expected. */
+  margin-top: -1px;
+  margin-bottom: -1px;
+}

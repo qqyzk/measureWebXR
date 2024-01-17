@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>PlayCanvas Hello Cube</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no' />
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
+    <script src='./src/playcanvas-stable.min.js'></script>
+</head>
+<body>
+    <canvas id='application'></canvas>
+    <input  id="button" type="button" value="start" > 
+    <script>
+        var btn = document.getElementById("button");  
+        btn.onclick = function conduct(){
+            console.log('click time',performance.now());
+                let loaded=false;
+        let name='Box';
+        let type='gltf';
+        let N=2;
+        // create a PlayCanvas application
+        const canvas = document.getElementById('application');
+        const app = new pc.Application(canvas);
+
+        // fill the available space at full resolution
+        app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);
+        app.setCanvasResolution(pc.RESOLUTION_AUTO);
+
+        // ensure canvas is resized when window changes size
+        window.addEventListener('resize', () => app.resizeCanvas());
+        let minx = -1.1, miny = -2.3, minz= -15;
+        let maxx = 1.1, maxy=2.3, maxz=-3;
+        let scale;
+        let edgeNum=N;
+        let url;
+        if(name==='Box' && type==='gltf'){
+            url='../gltf/Box/Box.gltf';
+            scale=0.1;
+        }else if(name==='Box' && type==='glb'){
+            url='../gltf/Box/Box.glb';
+            scale=0.1;
+        }else if(name==='BoxTextured' && type==='gltf'){
+            url='../gltf/BoxTextured4/BoxTextured.gltf';
+            scale=0.1;
+        }else if(name==='BoxTextured' && type==='glb'){
+            url='../gltf/BoxTextured/BoxTextured.glb';
+            scale=0.1;
+        }else if(name==='BoomBox' && type==='gltf'){
+            url='../gltf/BoomBox/BoomBox.gltf';
+            scale=7;
+        }else if(name==='BoomBox' && type==='glb'){
+            url='../gltf/BoomBox/BoomBox.glb';
+            scale=7;
+        }else if(name==='DamagedHelmet' && type==='gltf'){
+            url='../gltf/DamagedHelmet/DamagedHelmet.gltf';
+            scale=0.1;
+        }else if(name==='DamagedHelmet' && type==='glb'){
+            url='../gltf/DamagedHelmet/DamagedHelmet.glb';
+            scale=0.1;
+        }
+        app.assets.loadFromUrl(url, "container", function (err, asset) {
+            // create an instance using render component
+            const gltf= asset.resource.instantiateRenderEntity({
+                castShadows: true,
+            });
+            for(let i=0;i<edgeNum;++i){
+                for(let j=0;j<edgeNum;++j){
+                    for(let k=0;k<edgeNum;++k){
+                        let curx = minx + (maxx-minx)/(edgeNum-1)*i;
+                        let cury = miny+ (maxy-miny)/(edgeNum-1)*j;
+                        let curz = minz + (maxz-minz)/(edgeNum-1)*k;
+                        
+                        const entity = gltf.clone();
+                        entity.setPosition(curx,cury,curz);
+                        entity.setLocalScale(scale,scale,scale);
+                        app.root.addChild(entity);
+                    }
+                }
+            }
+            loaded=true;
+            console.log('scene loaded time',performance.now());
+        });
+        
+
+        
+
+        // create camera entity
+        const camera = new pc.Entity('camera');
+        camera.addComponent('camera', {
+            clearColor: new pc.Color(0.1, 0.1, 0.1)
+        });
+        app.root.addChild(camera);
+        camera.setPosition(0, 0, 3);
+
+        // create directional light entity
+        const light = new pc.Entity('light');
+        light.addComponent('light');
+        app.root.addChild(light);
+        light.setEulerAngles(45, 0, 0);
+
+        app.start();
+        let startFlag = true;
+            let frameCount = 0;
+            let startTime = null;
+            let shouldLog = true;
+            app.on("update", function (dt) {
+                    if(loaded){
+                        let time=performance.now();
+                        if (startFlag) {
+                            startTime = time;
+                            startFlag = false;
+                            console.log('startTime',startTime);
+                        }
+                        frameCount += 1;
+                        if(frameCount % 1000 === 0) {
+                            let fps = 1000 * frameCount / (time - startTime);
+                            console.log(frameCount,fps,'fps');
+                        } 
+                        if ((time - startTime) /1000 > 60 && shouldLog){
+                            shouldLog = false;
+                            let fps = 1000 * frameCount / (time - startTime);
+                            console.log('1min', (time - startTime)/1000, frameCount,fps,'fps');
+                            
+                        }
+                    }
+            });//on update
+        
+
+    }
+    </script>
+</body>
+</html> 

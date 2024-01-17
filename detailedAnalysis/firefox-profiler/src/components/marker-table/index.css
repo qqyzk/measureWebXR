@@ -1,0 +1,33 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+.markerTable {
+  display: flex;
+  flex: 1;
+  flex-flow: column nowrap;
+  cursor: default;
+  user-select: none;
+}
+
+.treeViewFixedColumn.start {
+  width: 80px;
+  text-align: right;
+}
+
+.treeViewFixedColumn.duration {
+  width: 80px;
+  text-align: right;
+}
+
+.treeViewHeaderColumn.name {
+  padding: 0 20px;
+}
+
+.treeViewFixedColumn.type {
+  width: 100px;
+}
+
+.treeViewRowColumn.type {
+  text-align: left;
+}

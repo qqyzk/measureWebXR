@@ -1,0 +1,170 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/**
+ * This file is a little different. It combines the GlobalTrack and LocalTrack css
+ * into one file, as it is mostly shared style.
+ */
+.timelineTrack {
+  padding: 0;
+  margin: 0;
+}
+
+.timelineTrackLocal {
+  margin-left: 15px;
+}
+
+.timelineTrackRow {
+  /* This is the width of the blue left border when a track is selected.
+   * This variable will be used every time we need to calculate some width that
+   * depends on this value, from the intended perceived width. */
+  --selected-left-border-width: 3px;
+
+  display: flex;
+  flex-flow: row nowrap;
+
+  /* This padding is added to the button's padding as the perceived padding. For
+   * a global row, it will be replaced with a margin when it's selected. */
+  padding-left: var(--selected-left-border-width);
+  border-top: 1px solid var(--grey-30);
+  background-color: #fff;
+}
+
+.timelineTrackRow.selected {
+  /* We replace the padding by some margin. Indeed the box-shadow used to draw
+   * the blue selected left border is drawn outside of the border box, so the
+   * 3px margin makes this space available. */
+  padding-left: 0;
+  margin-left: var(--selected-left-border-width);
+  background-color: #edf6ff;
+
+  /* We use a box-shadow on the track row instead of using border, so
+   * that when we select adjacent tracks, we see just one line, without any
+   * border on top of it. */
+  box-shadow: calc(-1 * var(--selected-left-border-width)) 0 var(--blue-60);
+}
+
+/* In the active tab view, we don't want any margin or padding, because
+ * otherwise we lose the alignment with the other panels. Therefore we won't
+ * have the blue left border when a track is selected in this view. */
+.timelineTrackRow.activeTab {
+  padding: 0;
+  margin: 0;
+}
+
+.timelineTrackLocalRow {
+  border-left: 1px solid var(--grey-30);
+}
+
+.timelineTrackLocalRow.selected {
+  /* By removing the left border, it looks like the blue border is on top of it.
+   * By using the transparent color instead of removing it altogether, we keep
+   * the 1px space. */
+  border-left-color: transparent;
+}
+
+.timelineTrackHidden {
+  height: 0;
+  pointer-events: none;
+}
+
+.timelineTrackLabel {
+  display: flex;
+
+  /* We want the width to look like it's 150px, but need to substract the 3px padding/margin */
+  width: calc(150px - var(--selected-left-border-width));
+  box-sizing: border-box;
+  flex-flow: row nowrap;
+  align-items: center;
+  border-right: 1px solid var(--grey-30);
+  cursor: default;
+}
+
+.timelineTrackNameButton {
+  overflow: hidden;
+
+  /* The 8px are used by the box-shadow when the button receives focus */
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
+
+  /* We want the left padding to look like 10px, but need to remove 3px to
+   * account for the padding/margin on the row. */
+  padding: 0 0 0 calc(10px - var(--selected-left-border-width));
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timelineTrackNameButtonAdditionalDetails {
+  color: var(--grey-90-a60);
+  font-size: 10px;
+}
+
+.timelineTrackCloseButton {
+  overflow: hidden;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  padding: 1px;
+  border: 0;
+  border-radius: 2px;
+  background: url(../../../res/img/svg/close-dark.svg) no-repeat center;
+  background-origin: content-box;
+  background-size: contain;
+  color: transparent;
+  margin-inline-end: 2px;
+  -moz-user-focus: ignore;
+}
+
+.timelineTrackCloseButton:hover {
+  background-color: rgb(0 0 0 / 0.15);
+}
+
+.timelineTrackCloseButton:active:hover {
+  background-color: rgb(0 0 0 / 0.3);
+}
+
+.timelineTrackLabel:not(:hover) > .timelineTrackCloseButton {
+  display: none;
+}
+
+.timelineTrackTrack {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-flow: column nowrap;
+}
+
+.timelineTrackLocalTracks {
+  position: relative;
+  padding: 0;
+  background: var(--grey-20);
+  list-style: none;
+}
+
+/**
+ * Local tracks are indented 15px. This rule adds an inset shadow overlay over the
+ * entire local tracks area, including the indented space. This is why it is shifted
+ * to the left, and slightly larger than 100%.
+ */
+.timelineTrackLocalTracks::before {
+  position: absolute;
+
+  /* Place it above the Reorderable component, which has a z-index of 2. */
+  z-index: 3;
+  left: -15px;
+  width: calc(100% + 15px);
+  height: 100%;
+  box-shadow: inset 0 1px 5px rgb(0 0 0 / 0.2);
+  content: '';
+  pointer-events: none;
+}
+
+.timelineTrackLocalLabel {
+  /* We want the width to look like it's 150px, but need to substract the 3px padding/margin and the 1px border */
+  width: calc(135px - var(--selected-left-border-width) - 1px);
+}

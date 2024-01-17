@@ -1,0 +1,35 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+.treeViewHeaderColumn.total,
+.treeViewHeaderColumn.self {
+  text-align: right;
+}
+
+/* The header for the totalPercent column is not visible */
+.treeViewHeaderColumn.totalPercent {
+  display: none;
+}
+
+.treeViewFixedColumn.self {
+  width: 70px;
+}
+
+.treeViewFixedColumn.icon {
+  display: flex;
+  flex-flow: column nowrap;
+  align-items: center;
+}
+
+.treeViewRowColumn.total,
+.treeViewRowColumn.totalPercent,
+.treeViewRowColumn.self,
+.treeViewRowColumn.timestamp {
+  text-align: right;
+}
+
+.treeBadge.inlined,
+.treeBadge.divergent-inlining {
+  background: url(../../../res/img/svg/inlined-icon.svg);
+}

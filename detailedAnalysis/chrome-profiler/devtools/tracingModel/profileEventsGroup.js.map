@@ -1,0 +1,1 @@
+{"version":3,"file":"profileEventsGroup.js","sourceRoot":"","sources":["../../../devtools/tracingModel/profileEventsGroup.ts"],"names":[],"mappings":";;AAEA,MAAqB,kBAAkB;IAGnC;;OAEG;IACH,YAAoB,KAAY;QAC5B,0CAA0C;QAC1C,IAAI,CAAC,QAAQ,GAAG,CAAC,KAAK,CAAC,CAAA;IAC3B,CAAC;IAED;;OAEG;IACI,QAAQ,CAAE,KAAY;QACzB,IAAI,CAAC,QAAQ,CAAC,IAAI,CAAC,KAAK,CAAC,CAAA;IAC7B,CAAC;CACJ;AAjBD,qCAiBC"}

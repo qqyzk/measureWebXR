@@ -1,0 +1,30 @@
+# Firefox Profiler development docs
+
+[profiler.firefox.com](https://profiler.firefox.com) is a client for reading profiles from the profiler component built inside of Firefox, known as the Gecko Profiler. It also can read in formats from [a variety of sources](./loading-in-profiles.md). The front-end client is written using JavaScript and [Flow types](https://flow.org/) using [React](https://facebook.github.io/react/) for the UI components and [Redux](http://redux.js.org/) for the state management. Firefox can interact with this client by directly injecting profiles into the webpage via a WebChannel mechanism. This code lives in Mozilla Central under [devtools/client/performance-new](https://searchfox.org/mozilla-central/source/devtools/client/performance-new)
+
+## The Docs
+
+ * [Firefox Profiler src docs](../src)
+   - [Redux action creators - `/src/actions`](../src/actions)
+   - [React components - `/src/components`](../src/components)
+   - [Manipulating and processing profiles - `/src/profile-logic`](../src/profile-logic)
+   - [Redux reducers - `/src/reducers`](../src/reducers)
+   - [Redux selectors- `/src/selectors`](../src/selectors)
+   - [Testing - `/src/test`](../src/test)
+     - [React component testing](../src/test/components)
+     - [Redux store testing](../src/test/store)
+     - [Unit testing](../src/test/unit)
+   - [Flow types - `/src/types`](../src/types)
+   - [Utility files - `/src/utils`](../src/utils)
+ * [Profiler architecture](./architecture.md)
+ * [Loading in profiles from various sources](./loading-in-profiles.md)
+ * [Gecko profile format](./gecko-profile-format.md)
+ * [Processed profile format](./processed-profile-format.md)
+ * [Writing a Custom Profile Importer](./custom-importer.md)
+ * [Markers](./markers.md)
+ * [Profile expiration and upgrading profiles](./upgrading-profiles.md)
+ * [Potential performance data sources in Gecko](./data-sources.md)
+ * [Call tree](./call-tree.md)
+ * [Frames, funcs, stacks and CallNodes in C++](./call-nodes-in-cpp.md)
+ * [Deploying to production](./deploying.md)
+ * [Symbolication](./symbolication.md)

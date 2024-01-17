@@ -1,0 +1,9 @@
+.chartCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.chartCanvas.hover {
+  cursor: default;
+}

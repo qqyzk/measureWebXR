@@ -1,0 +1,162 @@
+
+<html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <script src="./src/mindar-image-three.prod.js"></script>
+      <script type="importmap">
+        {
+            "imports": {
+                "three": "./src/three.module.js",
+                "GLTFLoader":"./src/GLTFLoader.js"
+            }
+        }
+    </script>  
+      <script type="module">
+        import { GLTFLoader } from 'GLTFLoader';
+       
+        
+        const THREE = window.MINDAR.IMAGE.THREE;
+        const mindarThree = new window.MINDAR.IMAGE.MindARThree({
+      container: document.querySelector("#container"),
+      imageTargetSrc: "./data/card.mind"
+        });
+        
+          
+        const {renderer, scene, camera} = mindarThree;
+        let loaded=false;
+        function init() {
+        const anchor = mindarThree.addAnchor(0);
+        const geometry = new THREE.PlaneGeometry(1, 0.55);
+        const material = new THREE.MeshBasicMaterial( {color: 0x00ffff, transparent: true, opacity: 0.5} );
+        const plane = new THREE.Mesh( geometry, material );
+        anchor.group.add(plane);
+        let loader = new GLTFLoader();
+        let name = 'BoxTextured';
+        let type = 'gltf';
+        let N=2;
+        let url;
+        if(name==='Box' && type==='gltf'){
+            url='../gltf/Box/Box.gltf';
+        }else if(name==='Box' && type==='glb'){
+            url='../gltf/Box/Box.glb';
+        }else if(name==='BoxTextured' && type==='gltf'){
+            url='../gltf/BoxTextured4/BoxTextured.gltf';
+        }else if(name==='BoxTextured' && type==='glb'){
+            url='../gltf/BoxTextured/BoxTextured.glb';
+        }else if(name==='BoomBox' && type==='gltf'){
+            url='../gltf/BoomBox/BoomBox.gltf';
+        }else if(name==='BoomBox' && type==='glb'){
+            url='../gltf/BoomBox/BoomBox.glb';
+        }else if(name==='DamagedHelmet' && type==='gltf'){
+            url='../gltf/DamagedHelmet/DamagedHelmet.gltf';
+        }else if(name==='DamagedHelmet' && type==='glb'){
+            url='../gltf/DamagedHelmet/DamagedHelmet.glb';
+        }
+        const light = new THREE.HemisphereLight( 0xffffbb, 0x080820, 1 );
+        scene.add( light );
+        loader.load( url, function ( gltf ) {
+            let minx = -0.5, miny = -0.8, minz= -25;
+            let maxx = 0.5, maxy=0.8, maxz=-11;
+            let edgeNum=N;
+            let scale;
+            if(name==="Box"){
+                scale=0.05;
+            }else if(name==='BoxTextured'){
+                scale=0.05;
+            }else if (name==='BoomBox'){
+                scale=4;
+            }else if(name==='DamagedHelmet'){
+                scale=0.05;
+            }
+            for(let i=0;i<edgeNum;++i){
+                for(let j=0;j<edgeNum;++j){
+                    for(let k=0;k<edgeNum;++k){
+                        let curx = minx + (maxx-minx)/(edgeNum-1)*i;
+                        let cury = miny+ (maxy-miny)/(edgeNum-1)*j;
+                        let curz = minz + (maxz-minz)/(edgeNum-1)*k;
+                        let model = gltf.scene.clone();
+                        model.position.set( curx,cury,curz);
+                        model.scale.set( scale, scale, scale );
+                        scene.add( model); 
+                    }
+                }
+            }
+            console.log('model loaded time',performance.now());
+            loaded=true;
+        });
+
+      }
+        const start = async() => {
+          console.log('click',performance.now());
+          init();
+          await mindarThree.start();
+          let startFlag = true;
+          let frameCount = 0;
+          let startTime = null;
+          let shouldLog = true;
+          let first = true;
+          let frameSum = 0;
+          let frameStart,frameEnd;
+          renderer.setAnimationLoop(() => {
+            frameStart = performance.now();
+            renderer.render(scene, camera);
+            let time = performance.now();
+			      if ( loaded){
+                if (startFlag) {
+                    startTime = time;
+                    startFlag = false;
+                    console.log('startTime',performance.now());
+                }
+                frameCount += 1;
+                frameEnd = performance.now();
+                frameSum += frameEnd - frameStart;
+                if(frameCount % 1000 === 0) {
+                    let fps = 1000 * frameCount / (time - startTime);
+                    let ft = frameSum/frameCount;
+                    console.log(frameCount,fps,'fps',ft,'ft');
+                } 
+                if ((time - startTime) /1000 > 60 && shouldLog){
+                    shouldLog = false;
+                    let fps = 1000 * frameCount / (time - startTime);
+                    let ft = frameSum/frameCount;
+                    console.log('1min', (time - startTime)/1000, frameCount,fps,'fps',ft,'ft');
+                }
+            }
+          });
+        }
+        const startButton = document.querySelector("#startButton");
+        startButton.addEventListener("click", () => {
+      start();
+        });
+        stopButton.addEventListener("click", () => {
+      mindarThree.stop();
+      mindarThree.renderer.setAnimationLoop(null);
+        });
+      </script>
+      <style>
+        body {
+      margin: 0;
+        }
+        #container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      overflow: hidden;
+        }
+        #control {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 2;
+        }
+      </style>
+    </head>
+    <body>
+      <div id="control">
+        <button id="startButton">Start</button>
+        <button id="stopButton">Stop</button>
+      </div>
+      <div id="container">
+      </div>
+    </body>
+  </html>
