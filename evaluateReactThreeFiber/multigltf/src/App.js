@@ -8,7 +8,7 @@ import { Suspense,useEffect} from "react";
 import ReactDOM from "react-dom";
 let name = 'Box';
 let type = 'gltf';
-let N=32;
+let N=2;
 function getPositions(n){
   let minx,miny,minz,maxx,maxy,maxz;
   if(name==='Box'){
@@ -131,7 +131,9 @@ export default function App() {
     const rootElement = document.getElementById("root");
     ReactDOM.render( <div className="App">
     <Canvas>
+    <color attach="background" args={['#000000']} />
     <Suspense fallback={null}>
+   
         <ambientLight intensity={0.1} />
         <directionalLight color="white" position={[0, 0, 5]} />
         <Model />
