@@ -32,6 +32,7 @@
                 var scene = new BABYLON.Scene(engine);
                 scene.createDefaultCameraOrLight(true, true, true);
                 scene.activeCamera.alpha += Math.PI;
+                scene.clearColor = new BABYLON.Color3(0, 0, 0);
                 let minx=-0.5, miny=-1.1, minz=-10;
                 let maxx=0.5, maxy=1.1, maxz = -2;
                 let edgeNum=N;
