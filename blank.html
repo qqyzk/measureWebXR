@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pure Black Page</title>
+    <style>
+        body {
+            background-color: black;
+            color: white; /* 设置文字颜色为白色，以确保内容可见 */
+        }
+
+        .content {
+            /* 如果你想在页面中间放置内容，你可以使用这些样式 */
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body>
+    <input  id="button" type="button" value="start" > 
+    <div class="content">
+        <!-- 这里放置你的内容 -->
+    </div>
+    <script>
+        var btn = document.getElementById("button");  
+        btn.onclick = function conduct(){
+        let startFlag = true;
+        let frameCount = 0;
+        let startTime = null;
+        let shouldLog = true;
+        let first = true;
+        let frameSum=0;
+        let loaded=true;
+        function animate(t) {
+            let frameStart = performance.now();
+			requestAnimationFrame( animate );
+           
+            let time = performance.now();
+          
+            if ( loaded){
+                let frameEnd = performance.now();
+                frameSum += frameEnd - frameStart;
+                if (startFlag) {
+                    startTime = time;
+                    startFlag = false;
+                    console.log('startTime',performance.now()+performance.timeOrigin);
+                }
+                frameCount += 1;
+                if(frameCount % 1000 === 0) {
+                    let fps = 1000 * frameCount / (time - startTime);
+                    let ft = frameSum/frameCount;
+                    console.log(frameCount,fps,'fps',ft,'ft');
+                } 
+                if ((time - startTime) /1000 > 60 && shouldLog){
+                    shouldLog = false;
+                    let fps = 1000 * frameCount / (time - startTime);
+                    let ft = frameSum/frameCount;
+                    console.log('1min',performance.now()+performance.timeOrigin, (time - startTime)/1000, frameCount,fps,'fps',ft,'ft');
+                  
+                }
+            }
+            
+          
+		}
+        window.requestAnimationFrame(animate);
+    }
+    </script>
+</body>
+</html>
