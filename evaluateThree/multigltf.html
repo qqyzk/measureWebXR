@@ -40,16 +40,16 @@
         import Stats from "./src/myStats.js";
         // import {DRACOLoader} from 'DRACOLoader';
         // import {DRACOLoader} from "./node_modules/three/examples/jsm/loaders/DRACOLoader.js";
-        let name = 'BoxTextured';
+        let name = 'Box';
         let type = 'gltf';
-        let N=2;
+        let N=32;
         let camera, scene, renderer,controls,stats,content;
         let loader,mesh; // we need to create a variable for a gltf model loader
         let models = [];
         var btn = document.getElementById("button");  
         btn.onclick = function conduct(){
             let loaded=false;
-        console.log('click time',performance.now());
+        console.log('click time',performance.now()+performance.timeOrigin);
 		init();
 		// animate();
 
@@ -130,7 +130,7 @@
                         }
                     }
                 }
-                console.log('model loaded time',performance.now());
+                // console.log('model loaded time',performance.now()+performance.timeOrigin);
                 loaded=true;
                 // let model = gltf.scene.clone();
                 // model.position.set( minx,miny,minz);
@@ -174,7 +174,8 @@
                 if (startFlag) {
                     startTime = time;
                     startFlag = false;
-                    console.log('startTime',performance.now());
+                    console.log('startTime',performance.now()+performance.timeOrigin);
+                   
                     // console.log(renderer.info)
                     // console.log(window.events.length)
                     // console.log(window.events)
