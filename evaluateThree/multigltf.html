@@ -42,7 +42,7 @@
         // import {DRACOLoader} from "./node_modules/three/examples/jsm/loaders/DRACOLoader.js";
         let name = 'Box';
         let type = 'gltf';
-        let N=32;
+        let N=2;
         let camera, scene, renderer,controls,stats,content;
         let loader,mesh; // we need to create a variable for a gltf model loader
         let models = [];
@@ -84,7 +84,7 @@
                 url='../gltf/Box/Box.glb';
             }else if(name==='BoxTextured' && type==='gltf'){
                 // url='../gltf/BoxTextured/BoxTextured.gltf';
-                url='../gltf/BoxTextured4/BoxTextured.gltf';
+                url='../gltf/BoxTextured2/BoxTextured.gltf';
             }else if(name==='BoxTextured' && type==='glb'){
                 url='../gltf/BoxTextured/BoxTextured.glb';
             }else if(name==='BoomBox' && type==='gltf'){
