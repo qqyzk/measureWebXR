@@ -6,7 +6,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { Suspense,useEffect} from "react";
 import ReactDOM from "react-dom";
-let name = 'Box';
+let name = 'BoxTextured';
 let type = 'gltf';
 let N=2;
 function getPositions(n){

@@ -2,6 +2,7 @@
   <head>
     <script src="./src/aframe.min.js"></script>
     <script src="./src/jquery.min.js"></script>
+    <!-- <script src="./src/aframe-ar.js"></script> -->
   </head>
   <body>
     <script>
@@ -40,9 +41,9 @@
                 } 
                 if ((time - this.data.startTime) /1000 > 60 && this.data.shouldLog){
                     this.data.shouldLog = false;
+                    let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
                     frameSum = frameEnd - frameStart;
                     let ft = frameSum/this.data.frameCount;
-                    let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
                     console.log('1min', (time - this.data.startTime)/1000, this.data.frameCount,fps,'fps');
                 }
             } else{
@@ -70,8 +71,8 @@
               let el = this.el;
               let sceneEl = document.querySelector('a-scene');
               el.addEventListener("model-loaded", e =>{    
-                  let minx=-0.8, miny = -1.8, minz = -10;
-                  let maxx=0.8,maxy=1.8,maxz=-3;
+                  let minx=-0.8, miny = -1.0, minz = -10;
+                  let maxx=0.8,maxy=1.0,maxz=-3;
                   let edgeNum=2;
                   for(let i=0;i<edgeNum;++i){
                     for(let j=0;j<edgeNum;++j){
@@ -84,8 +85,7 @@
                             entity.setAttribute('position',String(curx)+' '+String(cury) + ' '+ String(curz));
                             entity.setAttribute('scale',String(scale)+' '+String(scale)+' '+String(scale));    
                             // you can add event listeners here for interaction, such as mouse events.
-                            sceneEl.appendChild(entity);// Append the element to the scene, so it becomes part of the DOM.
-                            
+                            sceneEl.appendChild(entity);// Append the element to the scene, so it becomes part of the DOM. 
                         }
                     }
                   }
@@ -97,7 +97,7 @@
           }
       });
     </script>
-    <a-scene background="color: black" measure-fps>
+    <a-scene measure-fps>
       <a-asset >
         <a-asset-item id="gltfID" src='../gltf/BoxTextured4/BoxTextured.gltf'></a-asset-item>
       </a-asset>     

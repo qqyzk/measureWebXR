@@ -23,7 +23,8 @@
         
           
         const {renderer, scene, camera} = mindarThree;
-      
+        renderer.setPixelRatio(window.devicePixelRatio);
+			  renderer.setSize(window.innerWidth, window.innerHeight);
         let loaded=false;
         function init() {
         const anchor = mindarThree.addAnchor(0);
@@ -90,7 +91,7 @@
         const start = async() => {
           console.log('click',performance.now());
           init();
-          await mindarThree.start();
+          // await mindarThree.start();
           let startFlag = true;
           let frameCount = 0;
           let startTime = null;

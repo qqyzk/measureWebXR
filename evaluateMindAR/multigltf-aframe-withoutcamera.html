@@ -1,13 +1,13 @@
 <html>
   <head>
+    <script src="./src/mindar-image.prod.js"></script>
     <script src="./src/aframe.min.js"></script>
     <script src="./src/jquery.min.js"></script>
+    <!-- <script src="./src/mindar-image-aframe.prod.js"></script> -->
   </head>
   <body>
     <script>
       let loaded=false;
-      let frameSum = 0;
-      let frameStart,frameEnd;
       AFRAME.registerComponent('measure-fps', {
         schema: {
             startFlag: {type: 'bool', default:true},
@@ -20,12 +20,10 @@
           this.data.frameCount = 0;
           this.data.startTime = 0;
           this.data.shouldLog = true;
-          frameStart = performance.now();
         },
         tock: function () {
           if (loaded){
                 let time = performance.now();
-                frameEnd = time;
                 if (this.data.startFlag) {
                     this.data.startTime = time;
                     this.data.startFlag = false;
@@ -34,14 +32,10 @@
                 this.data.frameCount += 1;
                 if(this.data.frameCount % 1000 === 0) {
                     let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
-                    frameSum = frameEnd - frameStart;
-                    let ft = frameSum/this.data.frameCount;
                     console.log(this.data.frameCount,fps,'fps');
                 } 
                 if ((time - this.data.startTime) /1000 > 60 && this.data.shouldLog){
                     this.data.shouldLog = false;
-                    frameSum = frameEnd - frameStart;
-                    let ft = frameSum/this.data.frameCount;
                     let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
                     console.log('1min', (time - this.data.startTime)/1000, this.data.frameCount,fps,'fps');
                 }
@@ -70,8 +64,8 @@
               let el = this.el;
               let sceneEl = document.querySelector('a-scene');
               el.addEventListener("model-loaded", e =>{    
-                  let minx=-0.8, miny = -1.8, minz = -10;
-                  let maxx=0.8,maxy=1.8,maxz=-3;
+                  let minx=-0.8, miny = -1.0, minz = -10;
+                  let maxx=0.8,maxy=1.0,maxz=-3;
                   let edgeNum=2;
                   for(let i=0;i<edgeNum;++i){
                     for(let j=0;j<edgeNum;++j){
@@ -97,7 +91,7 @@
           }
       });
     </script>
-    <a-scene background="color: black" measure-fps>
+    <a-scene measure-fps mindar-image>
       <a-asset >
         <a-asset-item id="gltfID" src='../gltf/BoxTextured4/BoxTextured.gltf'></a-asset-item>
       </a-asset>     
