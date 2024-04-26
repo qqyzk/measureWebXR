@@ -1,6 +1,6 @@
 adb shell perfetto \
   -c - --txt \
-  -o /data/misc/perfetto-traces/trace-mindar-aframe-camera-4-8 \
+  -o /data/misc/perfetto-traces/try \
 <<EOF
 
 buffers: {
