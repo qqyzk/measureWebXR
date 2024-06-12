@@ -99,6 +99,7 @@
           let frameSum = 0;
           let frameStart,frameEnd;
           renderer.setAnimationLoop(() => {
+            console.log('new')
             frameStart = performance.now();
             renderer.render(scene, camera);
             let time = performance.now();

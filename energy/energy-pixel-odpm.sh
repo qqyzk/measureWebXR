@@ -1,6 +1,6 @@
 adb shell perfetto \
   -c - --txt \
-  -o /data/misc/perfetto-traces/try \
+  -o /data/misc/perfetto-traces/pixel-camera-rtf-4-32768\
 <<EOF
 
 buffers: {

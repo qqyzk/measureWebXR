@@ -8,7 +8,7 @@ import { Suspense,useEffect} from "react";
 import ReactDOM from "react-dom";
 let name = 'BoxTextured';
 let type = 'gltf';
-let N=2;
+let N=32;
 function getPositions(n){
   let minx,miny,minz,maxx,maxy,maxz;
   if(name==='Box'){
