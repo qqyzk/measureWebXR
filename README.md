@@ -33,6 +33,8 @@ Codes in `detailedAnalysis` provide the function for detailed analysis. First, u
 
 * `chrome-profiler/firefox-profiler/safari-profiler`: parsing and getting information from the profiled JSON file downloaded from Chrome/Firefox/Safari browser.
 
+Bash files in `energy` are used to trace power
+
 ### Set up local server
 
 You can use `http-server` to set up a local server. 
@@ -54,7 +56,7 @@ After setting up a local server, open a web browser, and visit an address like `
 
 To visit the web page on a mobile phone, you can connect your phone and PC to the same LAN. Another way is to use remote debug methods, like connecting the phone to PC via USB and visiting `chrome://inspect` on the PC. 
 
-### Analysis
+### Performance Analysis
 
 The time of the click, scene calculation, scene rendering, FPS, and FT will be logged to the web dev tool. You can use the tool in `detailedAnaliysis` to get the time of network transferring and image decoding (Chrome, Firefox), CPU usage, and GPU usage (Chrome). 
 
@@ -101,6 +103,12 @@ Use getinfo.js to analyze the file. The time of click and network transferring w
 ```sh
 node getinfo.js
 ```
+
+### Power Analysis
+
+Run `./energy/energy-pixel-odpm.sh` to read power rails
+
+Run `./energy/energy-mi10.sh` to read current and voltage
 
 ## Main Results
 
