@@ -1,14 +1,14 @@
 import "./styles.css";
 import { Canvas } from "@react-three/fiber";
 import { useLoader,addAfterEffect } from "@react-three/fiber";
-import { Environment, OrbitControls } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
-import { Suspense,useEffect} from "react";
-import ReactDOM from "react-dom";
+import { Suspense, useEffect, useState } from "react";
 let name = 'BoxTextured';
 let type = 'gltf';
 let N=32;
+const publicBaseUrl = process.env.PUBLIC_URL || '';
 function getPositions(n){
   let minx,miny,minz,maxx,maxy,maxz;
   if(name==='Box'){
@@ -44,39 +44,39 @@ const Model = () => {
     
     let url,scale;
     if(name==='Box' && type==='gltf'){
-      url="./gltf/Box/Box.gltf";
+      url=`${publicBaseUrl}/gltf/Box/box.gltf`;
       scale = 0.2;
     }else if(name==='Box' && type==='glb'){
-      url="./gltf/Box/Box.glb";
+      url=`${publicBaseUrl}/gltf/Box/Box.glb`;
       scale=0.2;
     }else if(name==='BoxTextured' && type==='gltf'){
-      url="./gltf/BoxTextured4/BoxTextured.gltf";
+      url=`${publicBaseUrl}/gltf/BoxTextured4/BoxTextured.gltf`;
       scale = 0.2;
     }else if(name==='BoxTextured' && type==='glb'){
-      url="./gltf/BoxTextured/BoxTextured.glb";
+      url=`${publicBaseUrl}/gltf/BoxTextured/BoxTextured.glb`;
       scale=0.2;
     }else if(name==='BoomBox' && type==='gltf'){
-      url="./gltf/BoomBox/BoomBox.gltf";
+      url=`${publicBaseUrl}/gltf/BoomBox/BoomBox.gltf`;
       scale = 10;
     }else if(name==='BoomBox' && type==='glb'){
-      url="./gltf/BoomBox/BoomBox.glb";
+      url=`${publicBaseUrl}/gltf/BoomBox/BoomBox.glb`;
       scale=10;
     }else if(name==='DamagedHelmet' && type==='gltf'){
-      url="./gltf/DamagedHelmet/DamagedHelmet.gltf";
+      url=`${publicBaseUrl}/gltf/DamagedHelmet/DamagedHelmet.gltf`;
       scale = 0.2;
     }else if(name==='DamagedHelmet' && type==='glb'){
-      url="./gltf/DamagedHelmet/DamagedHelmet.glb";
+      url=`${publicBaseUrl}/gltf/DamagedHelmet/DamagedHelmet.glb`;
       scale=0.2;
     }
     const gltf=useLoader(GLTFLoader,url , (loader) => {
         const dracoLoader = new DRACOLoader()
-        dracoLoader.setDecoderPath('./decoder/')
+        dracoLoader.setDecoderPath(`${publicBaseUrl}/decoder/`)
         loader.setDRACOLoader(dracoLoader)
     })
     
     let objs=[]
-    getPositions(N).map((item,key)=>{
-      let res = <primitive object={gltf.scene.clone()} scale={scale}  position={[item.x,item.y,item.z]}/>;
+    getPositions(N).forEach((item,key)=>{
+      let res = <primitive key={key} object={gltf.scene.clone()} scale={scale}  position={[item.x,item.y,item.z]}/>;
       objs.push(res);
     })
     loaded=true;
@@ -100,11 +100,13 @@ let startTime = null;
 let shouldLog = true;
 export default function App() {
 
+  const [started, setStarted] = useState(false);
+
 
   //react hook, 函数组件每一次更新都会触发effect
   //组件更新挂在完成->执行useLayoutEffect->浏览器dom绘制完成->执行useEffect回调
   useEffect(()=>{
-    addAfterEffect(()=>{
+    const unsubscribe = addAfterEffect(()=>{
       if (loaded){
           let time=performance.now();
           if (startFlag) {
@@ -124,30 +126,33 @@ export default function App() {
           }
       }
     })
-  })
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, [])
  
   const handleClick=()=>{
     console.log('click',performance.now());
-    const rootElement = document.getElementById("root");
-    ReactDOM.render( <div className="App">
-    <Canvas>
-    <color attach="background" args={['#000000']} />
-    <Suspense fallback={null}>
-   
-        <ambientLight intensity={0.1} />
-        <directionalLight color="white" position={[0, 0, 5]} />
-        <Model />
-        <OrbitControls />
-      </Suspense>
-    </Canvas>
-  </div>, rootElement);
+    setStarted(true);
   }
 
   return (
-    <div>
-      <button type="button" onClick={handleClick}>
-        Click Me
-      </button>
+    <div className="App">
+      {!started ? (
+        <button type="button" onClick={handleClick}>
+          Click Me
+        </button>
+      ) : (
+        <Canvas>
+          <color attach="background" args={['#000000']} />
+          <Suspense fallback={null}>
+            <ambientLight intensity={0.1} />
+            <directionalLight color="white" position={[0, 0, 5]} />
+            <Model />
+            <OrbitControls />
+          </Suspense>
+        </Canvas>
+      )}
     </div>
    
   );
