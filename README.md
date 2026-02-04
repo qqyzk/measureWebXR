@@ -162,3 +162,6 @@ Average frame time (ms) of different frameworks and different 3D model complexit
 
 <img src='docs/timeleft.png' height='150'>
 
+
+启动测评的办法：
+D:\TMC\measureWebXR>npx http-server -c-1 -p 8080
