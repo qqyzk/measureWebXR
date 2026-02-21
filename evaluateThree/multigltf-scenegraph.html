@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<title>Basic Scene with WebXR</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+	<!-- <link type="text/css" rel="stylesheet" href="style.css"> -->
+  <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r126/three.js" crossorigin="anonymous"></script> -->
+</head>
+
+<body>
+    <input  id="button" type="button" value="start" > 
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./node_modules/three/build/three.module.js",
+                "GLTFLoader":"./node_modules/three/examples/jsm/loaders/GLTFLoader.js",
+                "RoomEnvironment": "./node_modules/three/examples/jsm/environments/RoomEnvironment.js",
+                "stats": "./src/myStats.js",
+                "DRACOLoader": "./node_modules/three/examples/jsm/loaders/DRACOLoader.js"
+
+            }
+        }
+    </script> 
+	<script type="module">
+        window.events = [];
+
+       
+        // To start an AR scene with webXR, we can use a handy button provided by three.js
+        // We first have to import it because it is a javascript module
+       
+        // import * as THREE from 'three';
+        import * as THREE from './src/three.module.js';
+        // import { GLTFLoader } from 'GLTFLoader';
+        import {GLTFLoader} from "./src/GLTFLoader2.js";
+        // import { RoomEnvironment } from 'RoomEnvironment';
+        import {RoomEnvironment} from "./src/RoomEnvironment2.js";
+        // import Stats from 'stats';
+        import Stats from "./src/myStats.js";
+        // import {DRACOLoader} from 'DRACOLoader';
+        // import {DRACOLoader} from "./node_modules/three/examples/jsm/loaders/DRACOLoader.js";
+        let name = 'Box';
+        let type = 'gltf';
+        let N=8;
+        // Scene graph depth (including the model as the leaf level).
+        // 1: root -> model (same as before)
+        // 2: root -> group -> model
+        // 3: root -> group -> group -> model
+        // ...
+        let LEVELS = 4; // try 1..4, but the code supports any M>=1
+        let camera, scene, renderer,controls,stats,content;
+        let loader,mesh; // we need to create a variable for a gltf model loader
+        let models = [];
+        var btn = document.getElementById("button");  
+        btn.onclick = function conduct(){
+            let loaded=false;
+        console.log('click time',performance.now()+performance.timeOrigin);
+		init();
+		// animate();
+
+		function init() { 
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+            stats = new Stats();
+            stats.dom.style.top = '20px';
+            stats.dom.style.left = '300px';
+            container.appendChild(stats.dom);
+            renderer = new THREE.WebGLRenderer({alpha: true });
+			renderer.setPixelRatio(window.devicePixelRatio);
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			container.appendChild(renderer.domElement);
+           
+            const pmremGenerator = new THREE.PMREMGenerator( renderer );
+			scene = new THREE.Scene();
+            scene.environment = pmremGenerator.fromScene( new RoomEnvironment(), 0.04 ).texture;
+            scene.background = new THREE.Color( 0x000000 );
+			camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight,1,100 );
+           
+                
+            loader = new GLTFLoader();
+            //Draco Loader is needed for Draco compressed models
+            // const dracoLoader = new DRACOLoader();
+            // dracoLoader.setDecoderPath('./decoder/');
+            // loader.setDRACOLoader(dracoLoader);
+            let url;
+            if(name==='Box' && type==='gltf'){
+                url='../gltf/Box/box.gltf';
+            }else if(name==='Box' && type==='glb'){
+                url='../gltf/Box/Box.glb';
+            }else if(name==='BoxTextured' && type==='gltf'){
+                // url='../gltf/BoxTextured/BoxTextured.gltf';
+                url='../gltf/BoxTextured4/BoxTextured.gltf';
+            }else if(name==='BoxTextured' && type==='glb'){
+                url='../gltf/BoxTextured/BoxTextured.glb';
+            }else if(name==='BoomBox' && type==='gltf'){
+                url='../gltf/BoomBox/BoomBox.gltf';
+            }else if(name==='BoomBox' && type==='glb'){
+                url='../gltf/BoomBox/BoomBox.glb';
+            }else if(name==='DamagedHelmet' && type==='gltf'){
+                url='../gltf/DamagedHelmet/DamagedHelmet.gltf';
+            }else if(name==='DamagedHelmet' && type==='glb'){
+                url='../gltf/DamagedHelmet/DamagedHelmet.glb';
+            }else if(name==='Box6' && type==='gltf'){
+                url='../gltf/BoxTextured2048/BoxTextured.gltf';
+            }
+            loader.load( url, function ( gltf ) {
+                let minx = -0.5, miny = -0.8, minz= -20;
+                let maxx = 0.5, maxy=0.8, maxz=-3;
+                // let minx = -10, miny = -10, minz= -20;
+                // let maxx = 10, maxy=10, maxz=10;
+                let edgeNum=N;
+                let scale;
+                if(name==="Box"){
+                    scale=0.05;
+                }else if(name==='BoxTextured'){
+                    scale=0.05;
+                }else if (name==='BoomBox'){
+                    scale=4;
+                }else if(name==='DamagedHelmet'){
+                    scale=0.05;
+                }
+                console.log(edgeNum);
+
+                // Build a shared multi-level scene graph (octree-style partition on i/j/k).
+                // All intermediate nodes are THREE.Group; leaves are model clones.
+                // To keep the rendered result comparable, all groups stay at identity transform.
+                LEVELS = Math.max(1, Math.floor(LEVELS));
+                const rootForModels = (LEVELS === 1) ? scene : new THREE.Group();
+                if (LEVELS !== 1) {
+                    rootForModels.name = `SG_root_L${LEVELS}`;
+                    scene.add(rootForModels);
+                }
+
+                const groupCache = new Map(); // pathKey -> THREE.Group
+
+                function getOrCreateLeafParent(i, j, k, edgeNum) {
+                    if (LEVELS === 1) return rootForModels;
+
+                    // ranges are inclusive indices in [0, edgeNum-1]
+                    let x0 = 0, x1 = edgeNum - 1;
+                    let y0 = 0, y1 = edgeNum - 1;
+                    let z0 = 0, z1 = edgeNum - 1;
+
+                    let parent = rootForModels;
+                    let pathKey = '';
+
+                    // Create LEVELS-1 group layers. The model is attached under the last group.
+                    for (let level = 0; level < LEVELS - 1; level++) {
+                        const mx = (x0 + x1) >> 1;
+                        const my = (y0 + y1) >> 1;
+                        const mz = (z0 + z1) >> 1;
+
+                        const bx = (i > mx) ? 1 : 0;
+                        const by = (j > my) ? 1 : 0;
+                        const bz = (k > mz) ? 1 : 0;
+
+                        // 0..7 octant id
+                        const oct = (bx << 2) | (by << 1) | bz;
+                        pathKey += (level === 0) ? String(oct) : `/${oct}`;
+
+                        let grp = groupCache.get(pathKey);
+                        if (!grp) {
+                            grp = new THREE.Group();
+                            grp.name = `SG_L${level + 1}_O${oct}`;
+                            groupCache.set(pathKey, grp);
+                            parent.add(grp);
+                        }
+                        parent = grp;
+
+                        // narrow the range for the next level split
+                        if (bx === 0) x1 = mx; else x0 = mx + 1;
+                        if (by === 0) y1 = my; else y0 = my + 1;
+                        if (bz === 0) z1 = mz; else z0 = mz + 1;
+                    }
+
+                    return parent;
+                }
+
+                for(let i=0;i<edgeNum;++i){
+                    for(let j=0;j<edgeNum;++j){
+                        for(let k=0;k<edgeNum;++k){
+                            
+                            let curx = minx + (maxx-minx)/(edgeNum-1)*i;
+                            let cury = miny+ (maxy-miny)/(edgeNum-1)*j;
+                            let curz = minz + (maxz-minz)/(edgeNum-1)*k;
+                            let model = gltf.scene.clone();
+                           
+                            model.position.set( curx,cury,curz);
+                            model.scale.set( scale, scale, scale );
+                            const leafParent = getOrCreateLeafParent(i, j, k, edgeNum);
+                            leafParent.add( model);
+                        }
+                    }
+                }
+                // console.log('model loaded time',performance.now()+performance.timeOrigin);
+                loaded=true;
+                // let model = gltf.scene.clone();
+                // model.position.set( minx,miny,minz);
+                // model.scale.set( 4, 4, 4 );
+                // scene.add( model); 
+            })
+           
+           
+			window.addEventListener('resize', onWindowResize, false);
+		}
+
+		function onWindowResize() {
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+
+			renderer.setSize(window.innerWidth, window.innerHeight);
+		}
+        let startFlag = true;
+        let frameCount = 0;
+        let startTime = null;
+        let shouldLog = true;
+        let first = true;
+        let frameSum=0;
+		function animate(t) {
+            let frameStart = performance.now();
+			requestAnimationFrame( animate );
+            // for(let i=0;i<models.length;i++) {
+            //     models[i].rotation.y += 0.01;
+            // } 
+       
+            // console.log(timestamp);
+            let time = performance.now();
+            stats.update(time);
+           
+			renderer.render(scene, camera);
+          
+           
+            if ( loaded){
+                let frameEnd = performance.now();
+                frameSum += frameEnd - frameStart;
+                if (startFlag) {
+                    startTime = time;
+                    startFlag = false;
+                    console.log('startTime',performance.now()+performance.timeOrigin);
+                   
+                    // console.log(renderer.info)
+                    // console.log(window.events.length)
+                    // console.log(window.events)
+                   
+                }
+                frameCount += 1;
+                if(frameCount % 1000 === 0) {
+                    let fps = 1000 * frameCount / (time - startTime);
+                    let ft = frameSum/frameCount;
+                    console.log(frameCount,fps,'fps',ft,'ft');
+                } 
+                if ((time - startTime) /1000 > 60 && shouldLog){
+                    shouldLog = false;
+                    let fps = 1000 * frameCount / (time - startTime);
+                    let ft = frameSum/frameCount;
+                    console.log('1min', (time - startTime)/1000, frameCount,fps,'fps',ft,'ft');
+                  
+                }
+            }
+            
+          
+		}
+        window.requestAnimationFrame(animate);
+    }
+     
+	</script>
+</body>
+
+</html>
