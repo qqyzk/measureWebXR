@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Three.js glTF Viewer</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body>
+<input id="button" type="button" value="start">
+
+<script type="module">
+
+import * as THREE from './src/three.module.js';
+import { GLTFLoader } from "./src/GLTFLoader2.js";
+import { RoomEnvironment } from "./src/RoomEnvironment2.js";
+import Stats from "./src/myStats.js";
+
+const modelName = 'SheenChair'; // 'Sponza' | 'SheenChair' | 'ToyCar'
+let N = 2; // 网格边数，共加载 N³ 个模型
+
+let camera, scene, renderer, stats;
+let loaded = false;
+
+// 模型配置映射表
+const modelMap = {
+    'Sponza':     { fileName: 'Sponza.gltf', scale: 1 },
+    'SheenChair': { fileName: 'SheenChair.gltf', scale: 1 },
+    'ToyCar':     { fileName: 'ToyCar.gltf', scale: 1 }
+};
+
+document.getElementById("button").onclick = function () {
+    init();
+};
+
+function init() {
+
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
+    stats = new Stats();
+    stats.dom.style.position = 'absolute';
+    stats.dom.style.top = '10px';
+    stats.dom.style.left = '10px';
+    container.appendChild(stats.dom);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    container.appendChild(renderer.domElement);
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
+
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmremGenerator
+        .fromScene(new RoomEnvironment(), 0.04).texture;
+
+    camera = new THREE.PerspectiveCamera(
+        60,
+        window.innerWidth / window.innerHeight,
+        0.01,
+        10000
+    );
+
+    const loader = new GLTFLoader();
+    const config = modelMap[modelName];
+
+    if (!config) {
+        console.error("Model not found:", modelName);
+        return;
+    }
+
+    const url = `../gltf/${modelName}/${config.fileName}`;
+    console.log("Loading:", url);
+
+    loader.load(url, function (gltf) {
+
+        // 多个模型加载：为每个网格点克隆一个模型
+        let minx = -0.5, miny = -0.8, minz = -20;
+        let maxx = 0.5, maxy = 0.8, maxz = -3;
+        let edgeNum = N;
+        const scale = config.scale;
+
+        for (let i = 0; i < edgeNum; ++i) {
+            for (let j = 0; j < edgeNum; ++j) {
+                for (let k = 0; k < edgeNum; ++k) {
+                    let curx = minx + (maxx - minx) / (edgeNum - 1) * i;
+                    let cury = miny + (maxy - miny) / (edgeNum - 1) * j;
+                    let curz = minz + (maxz - minz) / (edgeNum - 1) * k;
+
+                    let model = gltf.scene.clone();
+                    model.position.set(curx, cury, curz);
+                    model.scale.set(scale, scale, scale);
+                    scene.add(model);
+                }
+            }
+        }
+
+        // 调整相机位置（仅在首次加载时）
+        if (modelName === "Sponza") {
+            camera = new THREE.PerspectiveCamera(
+                90,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                10000
+            );
+            camera.position.set(0.0, 0.0, 0.0);
+            camera.quaternion.set(0.0, -0.7072, 0.0, 0.7071);
+        }
+
+        loaded = true;
+        console.log("Models loaded:", modelName);
+
+    }, undefined, function (error) {
+        console.error("Load error:", error);
+    });
+
+    window.addEventListener('resize', onWindowResize);
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ===== 性能统计 =====
+let frameCount = 0;
+let startTime = null;
+let shouldLog = true;
+let frameSum = 0;
+
+function animate() {
+
+    let frameStart = performance.now();
+    requestAnimationFrame(animate);
+
+    if (!renderer) return;
+
+    let time = performance.now();
+    stats.update(time);
+    renderer.render(scene, camera);
+
+    if (loaded) {
+
+        let frameEnd = performance.now();
+        frameSum += frameEnd - frameStart;
+
+        if (frameCount === 0) {
+            startTime = time;
+        }
+
+        frameCount++;
+
+        if (frameCount % 1000 === 0) {
+            let fps = 1000 * frameCount / (time - startTime);
+            let ft = frameSum / frameCount;
+            console.log(frameCount, fps, "fps", ft, "ft");
+        }
+
+        if ((time - startTime) / 1000 > 60 && shouldLog) {
+            shouldLog = false;
+            let fps = 1000 * frameCount / (time - startTime);
+            let ft = frameSum / frameCount;
+            console.log("1min", fps, "fps", ft, "ft");
+        }
+    }
+}
+
+animate();
+
+</script>
+</body>
+</html>

@@ -17,7 +17,7 @@
             btn.onclick = function conduct(){
                 console.log('click time',performance.now());
                     let loaded=false;
-            let name='BoxTextured';
+            let name='Box';
             let type='gltf';
             let N=16; 
             // get the canvas DOM element
@@ -38,7 +38,7 @@
                 let edgeNum=N;
                 let scale;
                 if(name==='Box' && type==='gltf'){
-                    url='../gltf/Box/Box.gltf';
+                    url='../gltf/Box/box.gltf';
                     scale=0.05;
                 }else if(name==='Box' && type==='glb'){
                     url='../gltf/Box/Box.glb';

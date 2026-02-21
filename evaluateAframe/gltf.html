@@ -1,0 +1,144 @@
+<html>
+  <head>
+    <script src="./src/aframe.min.js"></script>
+    <script src="./src/jquery.min.js"></script>
+  </head>
+  <body>
+    <input id="button" type="button" value="start">
+    <script>
+        let loaded = false;
+        let frameSum = 0;
+        let frameStart, frameEnd;
+
+        // 模型配置映射表
+        const modelName = 'Sponza'; // 'Sponza', 'SheenChair', 'ToyCar'
+        const modelMap = {
+            'Sponza': { path: 'gltf/Sponza/Sponza.gltf', scale: 0.8 },
+            'SheenChair': { path: 'gltf/SheenChair/SheenChair.gltf', scale: 1 },
+            'ToyCar': { path: 'gltf/ToyCar/ToyCar.gltf', scale: 50 }
+        };
+
+        let N = 2; // 网格边数，共加载 N³ 个模型
+
+        function getPositions(n) {
+            let minx = -20, miny = -10, minz = -10;
+            let maxx = 20, maxy = 10, maxz = 10;
+            let edgeNum = n;
+            let positions = [];
+
+            for (let i = 0; i < edgeNum; ++i) {
+                for (let j = 0; j < edgeNum; ++j) {
+                    for (let k = 0; k < edgeNum; ++k) {
+                        let curx = minx + (maxx - minx) / (edgeNum - 1) * i;
+                        let cury = miny + (maxy - miny) / (edgeNum - 1) * j;
+                        let curz = minz + (maxz - minz) / (edgeNum - 1) * k;
+                        positions.push({ 'x': curx, 'y': cury, 'z': curz });
+                    }
+                }
+            }
+
+            return positions;
+        }
+
+        AFRAME.registerComponent('measure-fps', {
+            schema: {
+                startFlag: { type: 'bool', default: true },
+                frameCount: { type: 'int', default: 0 },
+                startTime: { type: 'float', default: 0 },
+                shouldLog: { type: 'bool', default: true }
+            },
+            init: function () {
+                this.data.startFlag = true;
+                this.data.frameCount = 0;
+                this.data.startTime = 0;
+                this.data.shouldLog = true;
+                frameStart = performance.now();
+            },
+            tock: function () {
+                if (loaded) {
+                    let time = performance.now();
+                    frameEnd = time;
+                    if (this.data.startFlag) {
+                        this.data.startTime = time;
+                        this.data.startFlag = false;
+                        console.log('startTime', this.data.startTime);
+                    }
+                    this.data.frameCount += 1;
+                    if (this.data.frameCount % 1000 === 0) {
+                        let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
+                        frameSum = frameEnd - frameStart;
+                        let ft = frameSum / this.data.frameCount;
+                        console.log(this.data.frameCount, fps, 'fps', ft, 'ft');
+                    }
+                    if ((time - this.data.startTime) / 1000 > 60 && this.data.shouldLog) {
+                        this.data.shouldLog = false;
+                        frameSum = frameEnd - frameStart;
+                        let ft = frameSum / this.data.frameCount;
+                        let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
+                        console.log('1min', (time - this.data.startTime) / 1000, this.data.frameCount, fps, 'fps', ft, 'ft');
+                    }
+                } else {
+                    console.log('not loaded yet');
+                }
+            }
+        });
+
+        AFRAME.registerComponent('multigltf', {
+            init: function () {
+                console.log('init',performance.now());
+                const el = this.el;
+                const sceneEl = this.el.sceneEl;
+                const config = modelMap[modelName];
+
+                const camera = document.querySelector('[camera]');
+
+                if (modelName === 'Sponza') {
+                    camera.setAttribute('position', '0 10 50');
+                    camera.setAttribute('rotation', '0 0 0');
+                } else if (modelName === 'ToyCar') {
+                    camera.setAttribute('position', '0 0 5');
+                    camera.setAttribute('rotation', '0 0 0');
+                }
+
+                el.setAttribute('gltf-model', config.path);
+                el.setAttribute('scale', `${config.scale} ${config.scale} ${config.scale}`);
+
+                el.addEventListener("model-loaded", () => {
+                console.log("base model loaded");
+
+                getPositions(N).forEach((item) => {
+                    const entity = document.createElement('a-entity');
+                    entity.setAttribute('gltf-model', config.path);
+                    entity.setAttribute('position', `${item.x} ${item.y} ${item.z}`);
+                    entity.setAttribute('scale', `${config.scale} ${config.scale} ${config.scale}`);
+                    sceneEl.appendChild(entity);
+                });
+                console.log('scene loaded',performance.now());
+                loaded = true;
+                });
+            }
+            });
+
+        var btn = document.getElementById('button');
+        btn.onclick = function conduct() {
+            console.log('click time', performance.now());
+            loaded = false;
+
+            const config = modelMap[modelName];
+            if (!config) {
+                console.error('Model not found:', modelName);
+                return;
+            }
+
+            const modelPath = config.path;
+            const el = document.getElementById('gltfmodel');
+            el.setAttribute('gltf-model', modelPath);
+        };
+    </script>
+    <a-scene background="color: black" measure-fps>
+        <a-entity id="gltfmodel" multigltf></a-entity>
+      <a-entity camera orbit-controls="initialPosition: 0 0 -2"></a-entity> 
+    </a-scene>
+    
+  </body>
+</html>

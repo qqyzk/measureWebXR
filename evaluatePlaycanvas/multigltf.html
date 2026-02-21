@@ -20,7 +20,7 @@
         btn.onclick = function conduct(){
             console.log('click time',performance.now());
                 let loaded=false;
-        let name='BoxTextured';
+        let name='Box';
         let type='gltf';
         let N=16;
         // create a PlayCanvas application
@@ -39,7 +39,7 @@
         let edgeNum=N;
         let url;
         if(name==='Box' && type==='gltf'){
-            url='../gltf/Box/Box.gltf';
+            url='../gltf/Box/box.gltf';
             scale=0.1;
         }else if(name==='Box' && type==='glb'){
             url='../gltf/Box/Box.glb';

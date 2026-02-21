@@ -6,9 +6,9 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { Suspense,useEffect} from "react";
 import ReactDOM from "react-dom";
-let name = 'BoxTextured';
+let name = 'Box';
 let type = 'gltf';
-let N=32;
+let N=2;
 function getPositions(n){
   let minx,miny,minz,maxx,maxy,maxz;
   if(name==='Box'){
@@ -44,7 +44,7 @@ const Model = () => {
     
     let url,scale;
     if(name==='Box' && type==='gltf'){
-      url="./gltf/Box/Box.gltf";
+      url="/gltf/Box/box.gltf";
       scale = 0.2;
     }else if(name==='Box' && type==='glb'){
       url="./gltf/Box/Box.glb";

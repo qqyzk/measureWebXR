@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>My first babylon.js app</title>
+		<style>
+			body { margin: 0; }
+		</style>
+        <script src="./src/babylon.js"></script>
+        <script src="./src/babylon.glTFFileLoader.js"></script>
+	</head>
+	<body>
+        <canvas id="renderCanvas"></canvas>
+        <input id="button" type="button" value="start">
+		<script>
+            let loaded = false;
+            
+            // 模型配置映射表
+            const modelName = 'SheenChair'; // 'Sponza', 'SheenChair', 'ToyCar'
+            const modelMap = {
+                'Sponza': { fileName: 'Sponza.gltf', scale: 1 },
+                'SheenChair': { fileName: 'SheenChair.gltf', scale: 10 },
+                'ToyCar': { fileName: 'ToyCar.gltf', scale: 500 }
+            };
+
+            let N = 2; // 网格边数，共加载 N³ 个模型
+
+            function getPositions(n) {
+                let minx = -0.5, miny = -1.1, minz = -10;
+                let maxx = 0.5, maxy = 1.1, maxz = -2;
+                let edgeNum = n;
+                let positions = [];
+
+                for (let i = 0; i < edgeNum; ++i) {
+                    for (let j = 0; j < edgeNum; ++j) {
+                        for (let k = 0; k < edgeNum; ++k) {
+                            let curx = minx + (maxx - minx) / (edgeNum - 1) * i;
+                            let cury = miny + (maxy - miny) / (edgeNum - 1) * j;
+                            let curz = minz + (maxz - minz) / (edgeNum - 1) * k;
+                            positions.push({ 'x': curx, 'y': cury, 'z': curz });
+                        }
+                    }
+                }
+
+                return positions;
+            }
+
+            var btn = document.getElementById('button');
+            btn.onclick = function conduct() {
+                console.log('click time', performance.now());
+                loaded = false;
+                
+                // 获取模型配置
+                const modelConfig = modelMap[modelName];
+                if (!modelConfig) {
+                    console.error('Model not found:', modelName);
+                    return;
+                }
+                
+                // 构建模型路径
+                const modelPath = `../gltf/${modelName}/${modelConfig.fileName}`;
+                console.log('Loading model from:', modelPath);
+                
+                // get the canvas DOM element
+                var canvas = document.getElementById('renderCanvas');
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                
+                // Load the 3D engine
+                var engine = new BABYLON.Engine(canvas, {antialias: true, adaptToDeviceRatio: true});
+                
+                // CreateScene function that creates and return the scene
+                var createScene = function() {
+                    // Create a basic BJS Scene object
+                    var scene = new BABYLON.Scene(engine);
+                    scene.createDefaultCameraOrLight(true, true, true);
+                    scene.activeCamera.alpha += Math.PI;
+                    scene.clearColor = new BABYLON.Color3(0, 0, 0);
+                    
+                    return scene;
+                }
+                
+                // call the createScene function
+                var scene = createScene();
+                
+                // 加载模型
+                BABYLON.SceneLoader.LoadAssetContainer(modelPath, "", scene,
+                    (assets) => {
+                        // 克隆多个模型实例
+                        const scale = modelConfig.scale;
+
+                        getPositions(N).map((item, key) => {
+                            if (key === 0) {
+                                // 第一个直接使用原模型
+                                if (assets.meshes.length > 0) {
+                                    const mesh = assets.meshes[0];
+                                    mesh.scaling = new BABYLON.Vector3(scale, scale, scale);
+                                    mesh.position = new BABYLON.Vector3(item.x, item.y, item.z);
+                                }
+                            } else {
+                                // 其他的克隆
+                                if (assets.meshes.length > 0) {
+                                    const mesh = assets.meshes[0].clone();
+                                    mesh.scaling = new BABYLON.Vector3(scale, scale, scale);
+                                    mesh.position = new BABYLON.Vector3(item.x, item.y, item.z);
+                                    assets.meshes.push(mesh);
+                                }
+                            }
+                        });
+
+                        // 自动调整相机位置
+                        if (modelName === 'Sponza') {
+                            scene.activeCamera.alpha = -Math.PI / 2;
+                            scene.activeCamera.beta = Math.PI / 2.5;
+                            scene.activeCamera.radius = 30;
+                        } else {
+                            scene.activeCamera.alpha = -Math.PI / 2;
+                            scene.activeCamera.beta = Math.PI / 2.5;
+                            scene.activeCamera.radius = 30;
+                        }
+
+                        assets.addAllToScene();
+                        loaded = true;
+                        console.log('scene loaded time', performance.now());
+                    },
+                    undefined,
+                    function(error) {
+                        console.error('Load error:', error);
+                    }
+                );
+                
+                // 性能计数
+                let startFlag = true;
+                let frameCount = 0;
+                let startTime = null;
+                let shouldLog = true;
+                let frameSum = 0;
+                
+                // run the render loop
+                engine.runRenderLoop(function() {
+                    scene.render();
+                    
+                    if (loaded) {
+                        let frameStart = performance.now();
+                        let time = performance.now();
+                        
+                        if (startFlag) {
+                            startTime = time;
+                            startFlag = false;
+                            console.log('startTime', startTime);
+                        }
+                        
+                        frameCount += 1;
+                        frameSum += performance.now() - frameStart;
+                        
+                        if (frameCount % 1000 === 0) {
+                            let fps = 1000 * frameCount / (time - startTime);
+                            let ft = frameSum / frameCount;
+                            console.log(frameCount, fps, 'fps', ft, 'ft');
+                        }
+                        
+                        if ((time - startTime) / 1000 > 60 && shouldLog) {
+                            shouldLog = false;
+                            let fps = 1000 * frameCount / (time - startTime);
+                            let ft = frameSum / frameCount;
+                            console.log('1min', (time - startTime) / 1000, frameCount, fps, 'fps', ft, 'ft');
+                        }
+                    }
+                });
+                
+                // the canvas/window resize event handler
+                window.addEventListener('resize', function() {
+                    engine.resize();
+                });
+            };
+		</script>
+	</body>
+</html>

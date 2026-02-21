@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>PlayCanvas Hello Cube</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no' />
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
+    <script src='./src/playcanvas-stable.min.js'></script>
+</head>
+<body>
+    <canvas id='application'></canvas>
+    <input  id="button" type="button" value="start" > 
+    <script>
+        let loaded = false;
+        
+        // 模型配置映射表
+        const modelName = 'SheenChair'; // 'Sponza'|'SheenChair'|'ToyCar'
+        const modelMap = {
+            'Sponza': { fileName: 'Sponza.gltf', scale: 0.1 },
+            'SheenChair': { fileName: 'SheenChair.gltf', scale: 1 },
+            'ToyCar': { fileName: 'ToyCar.gltf', scale: 20 }
+        };
+
+        let N = 2; // 网格边数，共加载 N³ 个模型
+
+        function getPositions(n) {
+            let minx = -1.1, miny = -2.3, minz = -15;
+            let maxx = 1.1, maxy = 2.3, maxz = -3;
+            let edgeNum = n;
+            let positions = [];
+
+            for (let i = 0; i < edgeNum; ++i) {
+                for (let j = 0; j < edgeNum; ++j) {
+                    for (let k = 0; k < edgeNum; ++k) {
+                        let curx = minx + (maxx - minx) / (edgeNum - 1) * i;
+                        let cury = miny + (maxy - miny) / (edgeNum - 1) * j;
+                        let curz = minz + (maxz - minz) / (edgeNum - 1) * k;
+                        positions.push({ 'x': curx, 'y': cury, 'z': curz });
+                    }
+                }
+            }
+
+            return positions;
+        }
+
+        var btn = document.getElementById("button");  
+        btn.onclick = function conduct(){
+            console.log('click time', performance.now());
+            loaded = false;
+
+            // 获取模型配置
+            const modelConfig = modelMap[modelName];
+            if (!modelConfig) {
+                console.error('Model not found:', modelName);
+                return;
+            }
+
+            // 构建模型路径
+            const modelPath = `../gltf/${modelName}/${modelConfig.fileName}`;
+            console.log('Loading model from:', modelPath);
+
+            // create a PlayCanvas application
+            const canvas = document.getElementById('application');
+            const app = new pc.Application(canvas);
+
+            // fill the available space at full resolution
+            app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);
+            app.setCanvasResolution(pc.RESOLUTION_AUTO);
+
+            // ensure canvas is resized when window changes size
+            window.addEventListener('resize', () => app.resizeCanvas());
+
+            // 加载模型
+            app.assets.loadFromUrl(modelPath, "container", function (err, asset) {
+                // 克隆多个模型实例
+                const positions = getPositions(N);
+                
+                positions.forEach((item) => {
+                    const gltf = asset.resource.instantiateRenderEntity({
+                        castShadows: true,
+                    });
+                    
+                    gltf.setLocalScale(modelConfig.scale, modelConfig.scale, modelConfig.scale);
+                    gltf.setPosition(item.x, item.y, item.z);
+                    app.root.addChild(gltf);
+                });
+                
+                if(modelName === 'Sponza'){
+                    camera.setPosition(-100, 15, 0);
+                    camera.setEulerAngles(0, -90, 0);
+                }
+                loaded = true;
+                console.log('scene loaded time', performance.now());
+            });
+
+            // create camera entity
+            const camera = new pc.Entity('camera');
+            camera.addComponent('camera', {
+                clearColor: new pc.Color(0.1, 0.1, 0.1)
+            });
+            app.root.addChild(camera);
+            camera.setPosition(0, 0, 3);
+
+            // create directional light entity
+            const light = new pc.Entity('light');
+            light.addComponent('light');
+            app.root.addChild(light);
+            light.setEulerAngles(45, 0, 0);
+
+            app.start();
+
+            // 性能计数
+            let startFlag = true;
+            let frameCount = 0;
+            let startTime = null;
+            let shouldLog = true;
+            let frameSum = 0;
+
+            app.on("update", function (dt) {
+                if (loaded) {
+                    let frameStart = performance.now();
+                    let time = performance.now();
+                    
+                    if (startFlag) {
+                        startTime = time;
+                        startFlag = false;
+                        console.log('startTime', startTime);
+                    }
+                    
+                    frameCount += 1;
+                    frameSum += performance.now() - frameStart;
+                    
+                    if (frameCount % 1000 === 0) {
+                        let fps = 1000 * frameCount / (time - startTime);
+                        let ft = frameSum / frameCount;
+                        console.log(frameCount, fps, 'fps', ft, 'ft');
+                    }
+                    
+                    if ((time - startTime) / 1000 > 60 && shouldLog) {
+                        shouldLog = false;
+                        let fps = 1000 * frameCount / (time - startTime);
+                        let ft = frameSum / frameCount;
+                        console.log('1min', (time - startTime) / 1000, frameCount, fps, 'fps', ft, 'ft');
+                    }
+                }
+            }); // on update
+        };
+    </script>
+</body>
+</html> 
