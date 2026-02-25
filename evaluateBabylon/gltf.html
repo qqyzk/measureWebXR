@@ -15,19 +15,18 @@
 		<script>
             let loaded = false;
             
-            // 模型配置映射表
-            const modelName = 'SheenChair'; // 'Sponza', 'SheenChair', 'ToyCar'
+            const modelName = 'Duck'; // 'Duck', 'SheenChair', 'ToyCar'
             const modelMap = {
-                'Sponza': { fileName: 'Sponza.gltf', scale: 1 },
+                'Duck': { fileName: 'Duck.gltf', scale: 5 },
                 'SheenChair': { fileName: 'SheenChair.gltf', scale: 10 },
                 'ToyCar': { fileName: 'ToyCar.gltf', scale: 500 }
             };
 
-            let N = 2; // 网格边数，共加载 N³ 个模型
+            let N = 2; 
 
             function getPositions(n) {
-                let minx = -0.5, miny = -1.1, minz = -10;
-                let maxx = 0.5, maxy = 1.1, maxz = -2;
+                let minx = -10, miny = -5, minz = -5;
+                let maxx = 10, maxy = 5, maxz = 5;
                 let edgeNum = n;
                 let positions = [];
 
@@ -50,14 +49,12 @@
                 console.log('click time', performance.now());
                 loaded = false;
                 
-                // 获取模型配置
                 const modelConfig = modelMap[modelName];
                 if (!modelConfig) {
                     console.error('Model not found:', modelName);
                     return;
                 }
-                
-                // 构建模型路径
+          
                 const modelPath = `../gltf/${modelName}/${modelConfig.fileName}`;
                 console.log('Loading model from:', modelPath);
                 
@@ -83,22 +80,18 @@
                 // call the createScene function
                 var scene = createScene();
                 
-                // 加载模型
                 BABYLON.SceneLoader.LoadAssetContainer(modelPath, "", scene,
                     (assets) => {
-                        // 克隆多个模型实例
                         const scale = modelConfig.scale;
 
                         getPositions(N).map((item, key) => {
                             if (key === 0) {
-                                // 第一个直接使用原模型
                                 if (assets.meshes.length > 0) {
                                     const mesh = assets.meshes[0];
                                     mesh.scaling = new BABYLON.Vector3(scale, scale, scale);
                                     mesh.position = new BABYLON.Vector3(item.x, item.y, item.z);
                                 }
                             } else {
-                                // 其他的克隆
                                 if (assets.meshes.length > 0) {
                                     const mesh = assets.meshes[0].clone();
                                     mesh.scaling = new BABYLON.Vector3(scale, scale, scale);
@@ -108,16 +101,9 @@
                             }
                         });
 
-                        // 自动调整相机位置
-                        if (modelName === 'Sponza') {
-                            scene.activeCamera.alpha = -Math.PI / 2;
-                            scene.activeCamera.beta = Math.PI / 2.5;
-                            scene.activeCamera.radius = 30;
-                        } else {
-                            scene.activeCamera.alpha = -Math.PI / 2;
-                            scene.activeCamera.beta = Math.PI / 2.5;
-                            scene.activeCamera.radius = 30;
-                        }
+                        scene.activeCamera.alpha = -Math.PI / 2;
+                        scene.activeCamera.beta = Math.PI / 2.5;
+                        scene.activeCamera.radius = 30;
 
                         assets.addAllToScene();
                         loaded = true;
@@ -128,8 +114,7 @@
                         console.error('Load error:', error);
                     }
                 );
-                
-                // 性能计数
+            
                 let startFlag = true;
                 let frameCount = 0;
                 let startTime = null;

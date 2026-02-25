@@ -7,15 +7,14 @@ import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { Suspense, useEffect } from "react";
 import ReactDOM from "react-dom";
 
-// 模型配置映射表
-const modelName = 'Sponza'; // 可改为: 'Sponza', 'SheenChair', 'ToyCar'
+const modelName = 'Duck'; //  'Duck', 'SheenChair', 'ToyCar'
 const modelMap = {
-    'Sponza': { fileName: 'Sponza.gltf', scale: 0.1 },
+    'Duck': { fileName: 'Duck.gltf', scale: 1 },
     'SheenChair': { fileName: 'SheenChair.gltf', scale: 5 },
     'ToyCar': { fileName: 'ToyCar.gltf', scale: 50 }
 };
 
-let N = 2; // 网格边数
+let N = 2; 
 
 function getPositions(n) {
     let minx, miny, minz, maxx, maxy, maxz;
@@ -84,8 +83,6 @@ let startTime = null;
 let shouldLog = true;
 let frameSum = 0;
 export default function App() {
-    // react hook，每次组件更新后执行
-    // 组件更新挂在完成 -> 执行useLayoutEffect -> 浏览器dom绘制完成 -> 执行useEffect回调
     useEffect(() => {
         addAfterEffect(() => {
             if (loaded) {

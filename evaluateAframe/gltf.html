@@ -10,15 +10,14 @@
         let frameSum = 0;
         let frameStart, frameEnd;
 
-        // 模型配置映射表
-        const modelName = 'Sponza'; // 'Sponza', 'SheenChair', 'ToyCar'
+        const modelName = 'Duck'; // 'Duck', 'SheenChair', 'ToyCar'
         const modelMap = {
-            'Sponza': { path: 'gltf/Sponza/Sponza.gltf', scale: 0.8 },
+            'Duck': { path: 'gltf/Duck/Duck.gltf', scale: 10 },
             'SheenChair': { path: 'gltf/SheenChair/SheenChair.gltf', scale: 1 },
             'ToyCar': { path: 'gltf/ToyCar/ToyCar.gltf', scale: 50 }
         };
 
-        let N = 2; // 网格边数，共加载 N³ 个模型
+        let N = 2; 
 
         function getPositions(n) {
             let minx = -20, miny = -10, minz = -10;
@@ -92,7 +91,7 @@
 
                 const camera = document.querySelector('[camera]');
 
-                if (modelName === 'Sponza') {
+                if (modelName === 'Duck') {
                     camera.setAttribute('position', '0 10 50');
                     camera.setAttribute('rotation', '0 0 0');
                 } else if (modelName === 'ToyCar') {

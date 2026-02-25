@@ -18,19 +18,18 @@
     <script>
         let loaded = false;
         
-        // 模型配置映射表
-        const modelName = 'SheenChair'; // 'Sponza'|'SheenChair'|'ToyCar'
+        const modelName = 'SheenChair'; // 'Duck'|'SheenChair'|'ToyCar'
         const modelMap = {
-            'Sponza': { fileName: 'Sponza.gltf', scale: 0.1 },
-            'SheenChair': { fileName: 'SheenChair.gltf', scale: 1 },
-            'ToyCar': { fileName: 'ToyCar.gltf', scale: 20 }
+            'Duck': { fileName: 'Duck.gltf', scale: 0.01 },
+            'SheenChair': { fileName: 'SheenChair.gltf', scale: 4},
+            'ToyCar': { fileName: 'ToyCar.gltf', scale: 50 }
         };
 
-        let N = 2; // 网格边数，共加载 N³ 个模型
+        let N = 2; 
 
         function getPositions(n) {
-            let minx = -1.1, miny = -2.3, minz = -15;
-            let maxx = 1.1, maxy = 2.3, maxz = -3;
+            let minx = -3, miny = -3, minz = -15;
+            let maxx = 3, maxy = 3, maxz = 5;
             let edgeNum = n;
             let positions = [];
 
@@ -53,14 +52,12 @@
             console.log('click time', performance.now());
             loaded = false;
 
-            // 获取模型配置
             const modelConfig = modelMap[modelName];
             if (!modelConfig) {
                 console.error('Model not found:', modelName);
                 return;
             }
 
-            // 构建模型路径
             const modelPath = `../gltf/${modelName}/${modelConfig.fileName}`;
             console.log('Loading model from:', modelPath);
 
@@ -75,9 +72,7 @@
             // ensure canvas is resized when window changes size
             window.addEventListener('resize', () => app.resizeCanvas());
 
-            // 加载模型
             app.assets.loadFromUrl(modelPath, "container", function (err, asset) {
-                // 克隆多个模型实例
                 const positions = getPositions(N);
                 
                 positions.forEach((item) => {
@@ -90,10 +85,6 @@
                     app.root.addChild(gltf);
                 });
                 
-                if(modelName === 'Sponza'){
-                    camera.setPosition(-100, 15, 0);
-                    camera.setEulerAngles(0, -90, 0);
-                }
                 loaded = true;
                 console.log('scene loaded time', performance.now());
             });
@@ -104,7 +95,7 @@
                 clearColor: new pc.Color(0.1, 0.1, 0.1)
             });
             app.root.addChild(camera);
-            camera.setPosition(0, 0, 3);
+            camera.setPosition(0, 1.5, 3);
 
             // create directional light entity
             const light = new pc.Entity('light');
@@ -114,7 +105,6 @@
 
             app.start();
 
-            // 性能计数
             let startFlag = true;
             let frameCount = 0;
             let startTime = null;

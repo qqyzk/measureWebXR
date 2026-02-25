@@ -16,17 +16,16 @@ import { GLTFLoader } from "./src/GLTFLoader2.js";
 import { RoomEnvironment } from "./src/RoomEnvironment2.js";
 import Stats from "./src/myStats.js";
 
-const modelName = 'SheenChair'; // 'Sponza' | 'SheenChair' | 'ToyCar'
-let N = 2; // 网格边数，共加载 N³ 个模型
+const modelName = 'Duck'; // 'Duck' | 'SheenChair' | 'ToyCar'
+let N = 2; 
 
 let camera, scene, renderer, stats;
 let loaded = false;
 
-// 模型配置映射表
 const modelMap = {
-    'Sponza':     { fileName: 'Sponza.gltf', scale: 1 },
-    'SheenChair': { fileName: 'SheenChair.gltf', scale: 1 },
-    'ToyCar':     { fileName: 'ToyCar.gltf', scale: 1 }
+    'Duck':     { fileName: 'Duck.gltf', scale: 1 },
+    'SheenChair': { fileName: 'SheenChair.gltf', scale: 5 },
+    'ToyCar':     { fileName: 'ToyCar.gltf', scale: 50 }
 };
 
 document.getElementById("button").onclick = function () {
@@ -75,10 +74,8 @@ function init() {
     console.log("Loading:", url);
 
     loader.load(url, function (gltf) {
-
-        // 多个模型加载：为每个网格点克隆一个模型
-        let minx = -0.5, miny = -0.8, minz = -20;
-        let maxx = 0.5, maxy = 0.8, maxz = -3;
+        let minx = -3, miny = -3, minz = -10;
+        let maxx = 3, maxy = 3, maxz = 10;
         let edgeNum = N;
         const scale = config.scale;
 
@@ -97,18 +94,6 @@ function init() {
             }
         }
 
-        // 调整相机位置（仅在首次加载时）
-        if (modelName === "Sponza") {
-            camera = new THREE.PerspectiveCamera(
-                90,
-                window.innerWidth / window.innerHeight,
-                0.1,
-                10000
-            );
-            camera.position.set(0.0, 0.0, 0.0);
-            camera.quaternion.set(0.0, -0.7072, 0.0, 0.7071);
-        }
-
         loaded = true;
         console.log("Models loaded:", modelName);
 
@@ -125,7 +110,6 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// ===== 性能统计 =====
 let frameCount = 0;
 let startTime = null;
 let shouldLog = true;
