@@ -4,12 +4,16 @@ import { useLoader,addAfterEffect } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
-import { Suspense, useEffect, useState } from "react";
+import * as THREE from "three";
+import { Suspense, useEffect, useMemo, useState } from "react";
 let name = 'BoxTextured';
 let type = 'gltf';
-let N=32;
+const params = new URLSearchParams(window.location.search);
+const MODE = params.get('mode') || 'flat'; // 'flat' | 'scenegraph'
+const LEVELS = Number(params.get('levels') || 4);
+let N=Number(params.get('n') || 32);
 const publicBaseUrl = process.env.PUBLIC_URL || '';
-function getPositions(n){
+function getBounds(){
   let minx,miny,minz,maxx,maxy,maxz;
   if(name==='Box'){
     minx = -2.5; miny = -4; minz= -15;
@@ -24,6 +28,11 @@ function getPositions(n){
     minx = -2.5; miny = -4; minz= -15;
     maxx = 2.5; maxy=5; maxz=-3;
   }
+  return { minx, miny, minz, maxx, maxy, maxz };
+}
+
+function getPositions(n){
+  const { minx, miny, minz, maxx, maxy, maxz } = getBounds();
   let edgeNum=n;
   let positions = [];
   for(let i=0;i<edgeNum;++i){
@@ -73,22 +82,97 @@ const Model = () => {
         dracoLoader.setDecoderPath(`${publicBaseUrl}/decoder/`)
         loader.setDRACOLoader(dracoLoader)
     })
+
+    const edgeNum = N;
+    const { minx, miny, minz, maxx, maxy, maxz } = getBounds();
+    const levels = Math.max(1, Math.floor(Number.isFinite(LEVELS) ? LEVELS : 1));
+
+    const sceneGraphRoot = useMemo(() => {
+      if (MODE !== 'scenegraph') return null;
+
+      const rootForModels = new THREE.Group();
+      rootForModels.name = `SG_root_L${levels}`;
+
+      const groupCache = new Map(); // pathKey -> THREE.Group
+
+      function getOrCreateLeafParent(i, j, k, edgeNum) {
+        if (levels === 1) return rootForModels;
+
+        let x0 = 0, x1 = edgeNum - 1;
+        let y0 = 0, y1 = edgeNum - 1;
+        let z0 = 0, z1 = edgeNum - 1;
+
+        let parent = rootForModels;
+        let pathKey = '';
+
+        for (let level = 0; level < levels - 1; level++) {
+          const mx = (x0 + x1) >> 1;
+          const my = (y0 + y1) >> 1;
+          const mz = (z0 + z1) >> 1;
+
+          const bx = (i > mx) ? 1 : 0;
+          const by = (j > my) ? 1 : 0;
+          const bz = (k > mz) ? 1 : 0;
+
+          const oct = (bx << 2) | (by << 1) | bz;
+          pathKey += (level === 0) ? String(oct) : `/${oct}`;
+
+          let grp = groupCache.get(pathKey);
+          if (!grp) {
+            grp = new THREE.Group();
+            grp.name = `SG_L${level + 1}_O${oct}`;
+            groupCache.set(pathKey, grp);
+            parent.add(grp);
+          }
+          parent = grp;
+
+          if (bx === 0) x1 = mx; else x0 = mx + 1;
+          if (by === 0) y1 = my; else y0 = my + 1;
+          if (bz === 0) z1 = mz; else z0 = mz + 1;
+        }
+
+        return parent;
+      }
+
+      for(let i=0;i<edgeNum;++i){
+        for(let j=0;j<edgeNum;++j){
+          for(let k=0;k<edgeNum;++k){
+            let curx = minx + (maxx-minx)/(edgeNum-1)*i;
+            let cury = miny+ (maxy-miny)/(edgeNum-1)*j;
+            let curz = minz + (maxz-minz)/(edgeNum-1)*k;
+
+            const model = gltf.scene.clone();
+            model.position.set(curx, cury, curz);
+            model.scale.set(scale, scale, scale);
+            const leafParent = getOrCreateLeafParent(i, j, k, edgeNum);
+            leafParent.add(model);
+          }
+        }
+      }
+
+      return rootForModels;
+    }, [gltf, edgeNum, levels, maxx, maxy, maxz, minx, miny, minz, scale]);
+
+    useEffect(() => {
+      loaded=true;
+      console.log('scene loaded',performance.now());
+    }, [sceneGraphRoot]);
     
     let objs=[]
-    getPositions(N).forEach((item,key)=>{
-      let res = <primitive key={key} object={gltf.scene.clone()} scale={scale}  position={[item.x,item.y,item.z]}/>;
-      objs.push(res);
-    })
-    loaded=true;
-    console.log('scene loaded',performance.now());
+    if (MODE !== 'scenegraph') {
+      getPositions(edgeNum).forEach((item,key)=>{
+        let res = <primitive key={key} object={gltf.scene.clone()} scale={scale}  position={[item.x,item.y,item.z]}/>;
+        objs.push(res);
+      })
+    }
     return (
       <>
       {
-        objs
+        (MODE === 'scenegraph') ? <primitive object={sceneGraphRoot} /> : objs
       }
       </>
     );
-  
+   
 };
 
 
