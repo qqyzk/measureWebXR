@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Lighting / Shading - Phong vs PBR</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        body { margin: 0; background: #111; overflow: hidden; }
+        #info {
+            position: absolute; top: 10px; left: 10px; color: #fff;
+            font-family: monospace; font-size: 13px; background: rgba(0,0,0,0.6);
+            padding: 8px; border-radius: 4px; line-height: 1.7;
+        }
+        #labels {
+            position: absolute; bottom: 30px; width: 100%;
+            display: flex; justify-content: space-around;
+            pointer-events: none;
+        }
+        .label {
+            color: #fff; font-family: monospace; font-size: 14px;
+            background: rgba(0,0,0,0.5); padding: 4px 12px; border-radius: 4px;
+        }
+        #controls {
+            position: absolute; top: 10px; right: 10px; color: #fff;
+            font-family: monospace; font-size: 13px; background: rgba(0,0,0,0.6);
+            padding: 10px; border-radius: 4px;
+        }
+        select, input[type=range] { margin-left: 6px; }
+    </style>
+</head>
+
+<body>
+    <div id="info">
+        Lighting / Shading Comparison<br>
+        <b>Left:</b> Phong (MeshPhongMaterial)<br>
+        <b>Right:</b> PBR (MeshStandardMaterial)<br>
+        Divider shows same geometry under the same light
+    </div>
+
+    <div id="controls">
+        Light type:
+        <select id="light-type">
+            <option value="point">PointLight</option>
+            <option value="directional">DirectionalLight</option>
+            <option value="spot">SpotLight</option>
+        </select><br><br>
+        Roughness (PBR): <span id="rough-val">0.5</span><br>
+        <input type="range" id="roughness" min="0" max="1" step="0.01" value="0.5"><br>
+        Metalness (PBR): <span id="metal-val">0.5</span><br>
+        <input type="range" id="metalness" min="0" max="1" step="0.01" value="0.5"><br>
+        Shininess (Phong): <span id="shine-val">50</span><br>
+        <input type="range" id="shininess" min="1" max="300" step="1" value="50">
+    </div>
+
+    <div id="labels">
+        <span class="label">Phong</span>
+        <span class="label">PBR (MeshStandardMaterial)</span>
+    </div>
+
+    <script type="module">
+        import * as THREE from './src/three.module.js';
+
+        // ── Scene setup ───────────────────────────────────────────
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.physicallyCorrectLights = true;  // needed for PBR accuracy
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.0;
+        document.body.appendChild(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a2e);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 3, 8);
+        camera.lookAt(0, 0, 0);
+
+        // ── Materials ─────────────────────────────────────────────
+        // Phong: older, non-physically-based
+        const phongMat = new THREE.MeshPhongMaterial({
+            color: 0xff6633,
+            shininess: 50,
+            specular: new THREE.Color(0xffffff)
+        });
+
+        // PBR (Physically Based Rendering): MeshStandardMaterial
+        const pbrMat = new THREE.MeshStandardMaterial({
+            color: 0xff6633,
+            roughness: 0.5,
+            metalness: 0.5
+        });
+
+        // ── Geometry: same sphere for both ───────────────────────
+        const geo = new THREE.SphereGeometry(1, 64, 64);
+
+        const spherePhong = new THREE.Mesh(geo, phongMat);
+        spherePhong.position.set(-2, 0, 0);
+        spherePhong.castShadow = true;
+        scene.add(spherePhong);
+
+        const spherePBR = new THREE.Mesh(geo, pbrMat);
+        spherePBR.position.set(2, 0, 0);
+        spherePBR.castShadow = true;
+        scene.add(spherePBR);
+
+        // Ground plane
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(20, 20),
+            new THREE.MeshStandardMaterial({ color: 0x334455, roughness: 0.9, metalness: 0.0 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -1.5;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Divider line
+        const divGeo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, -1.5, 5),
+            new THREE.Vector3(0, 3, 5)
+        ]);
+        scene.add(new THREE.Line(divGeo, new THREE.LineBasicMaterial({ color: 0x888888 })));
+
+        // ── Lights ────────────────────────────────────────────────
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.15);
+        scene.add(ambientLight);
+
+        // Dynamic main light (type changes via UI)
+        let mainLight = null;
+        let lightHelper = null;
+
+        function buildLight(type) {
+            if (mainLight) { scene.remove(mainLight); mainLight.dispose?.(); }
+            if (lightHelper) scene.remove(lightHelper);
+
+            switch (type) {
+                case 'point': {
+                    mainLight = new THREE.PointLight(0xffffff, 2, 30);
+                    mainLight.position.set(3, 5, 3);
+                    mainLight.castShadow = true;
+                    scene.add(mainLight);
+                    lightHelper = new THREE.PointLightHelper(mainLight, 0.3);
+                    scene.add(lightHelper);
+                    break;
+                }
+                case 'directional': {
+                    mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
+                    mainLight.position.set(5, 8, 5);
+                    mainLight.castShadow = true;
+                    mainLight.shadow.mapSize.set(1024, 1024);
+                    scene.add(mainLight);
+                    lightHelper = new THREE.DirectionalLightHelper(mainLight, 1);
+                    scene.add(lightHelper);
+                    break;
+                }
+                case 'spot': {
+                    mainLight = new THREE.SpotLight(0xffffff, 3, 30, Math.PI / 6, 0.3);
+                    mainLight.position.set(0, 8, 2);
+                    mainLight.castShadow = true;
+                    scene.add(mainLight);
+                    lightHelper = new THREE.SpotLightHelper(mainLight);
+                    scene.add(lightHelper);
+                    break;
+                }
+            }
+        }
+        buildLight('point');
+
+        // ── UI controls ───────────────────────────────────────────
+        document.getElementById('light-type').addEventListener('change', (e) => {
+            buildLight(e.target.value);
+        });
+
+        document.getElementById('roughness').addEventListener('input', (e) => {
+            pbrMat.roughness = parseFloat(e.target.value);
+            document.getElementById('rough-val').textContent = e.target.value;
+        });
+        document.getElementById('metalness').addEventListener('input', (e) => {
+            pbrMat.metalness = parseFloat(e.target.value);
+            document.getElementById('metal-val').textContent = e.target.value;
+        });
+        document.getElementById('shininess').addEventListener('input', (e) => {
+            phongMat.shininess = parseFloat(e.target.value);
+            document.getElementById('shine-val').textContent = e.target.value;
+        });
+
+        // ── Animate ───────────────────────────────────────────────
+        const clock = new THREE.Clock();
+        let frameCount = 0, startTime = null, shouldLog = true;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const t = clock.getElapsedTime();
+
+            // Orbit light around the scene
+            if (mainLight) {
+                mainLight.position.x = Math.sin(t * 0.5) * 5;
+                mainLight.position.z = Math.cos(t * 0.5) * 5;
+                if (lightHelper) lightHelper.update?.();
+            }
+
+            renderer.render(scene, camera);
+
+            const now = performance.now();
+            if (startTime === null) startTime = now;
+            frameCount++;
+            if (frameCount % 300 === 0) {
+                const fps = 1000 * frameCount / (now - startTime);
+                console.log(`frame ${frameCount}  fps: ${fps.toFixed(1)}`);
+            }
+            if ((now - startTime) / 1000 > 60 && shouldLog) {
+                shouldLog = false;
+                const fps = 1000 * frameCount / (now - startTime);
+                console.log('1min result', fps.toFixed(1), 'fps');
+            }
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+
+</html>

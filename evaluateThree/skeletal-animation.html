@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Skeletal Animation - Three.js</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        body { margin: 0; background: #222; overflow: hidden; }
+        #info {
+            position: absolute; top: 10px; left: 10px; color: #fff;
+            font-family: monospace; font-size: 13px; background: rgba(0,0,0,0.55);
+            padding: 8px; border-radius: 4px; line-height: 1.6;
+        }
+        #controls {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 8px;
+        }
+        button {
+            padding: 6px 14px; font-size: 13px; cursor: pointer;
+            border-radius: 4px; border: 1px solid #888; background: rgba(0,0,0,0.6); color: #fff;
+        }
+        button.active { background: rgba(80,160,255,0.7); }
+    </style>
+</head>
+
+<body>
+    <div id="info">
+        Skeletal Animation (Three.js AnimationMixer)<br>
+        Reference: <a href="https://threejs.org/examples/#webgl_animation_skinning_morph" style="color:#8cf" target="_blank">
+            threejs.org/examples – skinning/morph</a><br>
+        <span id="status">Load a model with animations via GLTFLoader</span>
+    </div>
+    <div id="controls">
+        <button id="btn-idle"  class="active">Idle</button>
+        <button id="btn-walk">Walk</button>
+        <button id="btn-run">Run</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from './src/three.module.js';
+        import { GLTFLoader } from './src/GLTFLoader2.js';
+
+        let camera, scene, renderer, mixer, clock;
+        let actions = {}, activeAction, previousAction;
+        let skeleton;
+        let frameCount = 0, startTime = null, shouldLog = true;
+
+        // ── Model path ───────────────────────────────────────────
+        // Three.js official skeletal animation example model:
+        //   https://threejs.org/examples/models/gltf/Soldier.glb
+        // Place the .glb file at the path below, or update the path.
+        const MODEL_URL = '../gltf/Soldier/Soldier.glb';
+
+        init();
+        animate();
+
+        function init() {
+            clock = new THREE.Clock();
+
+            const container = document.createElement('div');
+            document.body.appendChild(container);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x334455);
+            scene.fog = new THREE.Fog(0x334455, 10, 50);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(1, 2, 5);
+            camera.lookAt(0, 1, 0);
+
+            // Lights
+            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+            hemiLight.position.set(0, 20, 0);
+            scene.add(hemiLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(5, 10, 5);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.set(1024, 1024);
+            scene.add(dirLight);
+
+            // Ground
+            const ground = new THREE.Mesh(
+                new THREE.PlaneGeometry(20, 20),
+                new THREE.MeshPhongMaterial({ color: 0x556677, depthWrite: false })
+            );
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // Grid helper
+            scene.add(new THREE.GridHelper(20, 20, 0x445566, 0x334455));
+
+            // Load GLTF with skeletal animation
+            const loader = new GLTFLoader();
+            loader.load(
+                MODEL_URL,
+                (gltf) => {
+                    const model = gltf.scene;
+                    model.traverse((obj) => {
+                        if (obj.isMesh) obj.castShadow = true;
+                    });
+                    scene.add(model);
+
+                    // AnimationMixer — core Three.js class for playing animations
+                    mixer = new THREE.AnimationMixer(model);
+
+                    // SkeletonHelper: visualises the bone hierarchy
+                    skeleton = new THREE.SkeletonHelper(model);
+                    skeleton.visible = false;
+                    scene.add(skeleton);
+
+                    // Map animation clips by name (Soldier.glb has Idle/Walk/Run)
+                    gltf.animations.forEach((clip) => {
+                        actions[clip.name] = mixer.clipAction(clip);
+                        console.log('Animation clip:', clip.name);
+                    });
+
+                    document.getElementById('status').textContent =
+                        'Clips: ' + Object.keys(actions).join(', ');
+
+                    // Start with first available clip
+                    const firstKey = Object.keys(actions)[0];
+                    if (firstKey) {
+                        activeAction = actions[firstKey];
+                        activeAction.play();
+                    }
+                },
+                (xhr) => {
+                    document.getElementById('status').textContent =
+                        'Loading: ' + Math.round(xhr.loaded / xhr.total * 100) + '%';
+                },
+                (err) => {
+                    console.error(err);
+                    document.getElementById('status').textContent =
+                        'Load error: ' + err.message + '  (place Soldier.glb at ' + MODEL_URL + ')';
+                    // Fallback: show a procedural skinned mesh demo
+                    createProceduralSkeleton();
+                }
+            );
+
+            // UI buttons
+            document.getElementById('btn-idle').onclick = () => switchAction('Idle');
+            document.getElementById('btn-walk').onclick = () => switchAction('Walk');
+            document.getElementById('btn-run').onclick  = () => switchAction('Run');
+
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 's') { skeleton.visible = !skeleton.visible; }
+            });
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        // Cross-fade between animation clips
+        function switchAction(name) {
+            if (!actions[name]) { console.warn('No clip:', name); return; }
+            previousAction = activeAction;
+            activeAction = actions[name];
+            if (previousAction && previousAction !== activeAction) {
+                previousAction.fadeOut(0.3);
+            }
+            activeAction.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).fadeIn(0.3).play();
+
+            document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn-' + name.toLowerCase()).classList.add('active');
+        }
+
+        // ── Fallback: procedural skinned cube (no GLTF needed) ───
+        function createProceduralSkeleton() {
+            document.getElementById('status').textContent =
+                'Fallback: procedural SkinnedMesh (press S to toggle skeleton)';
+
+            // Geometry with skin indices/weights for 2 bones
+            const geo = new THREE.CylinderGeometry(0.15, 0.15, 2, 8, 8);
+            const pos = geo.attributes.position;
+            const skinIndices = [], skinWeights = [];
+            for (let i = 0; i < pos.count; i++) {
+                const y = pos.getY(i); // -1 … 1
+                const t = (y + 1) / 2; // 0 (bottom bone) → 1 (top bone)
+                skinIndices.push(0, 1, 0, 0);
+                skinWeights.push(1 - t, t, 0, 0);
+            }
+            geo.setAttribute('skinIndex',  new THREE.Uint16BufferAttribute(skinIndices, 4));
+            geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(skinWeights, 4));
+
+            const mat = new THREE.MeshPhongMaterial({ color: 0x88aaff, wireframe: false, skinning: true });
+            const mesh = new THREE.SkinnedMesh(geo, mat);
+
+            // Two bones: root at 0,0,0 and tip at 0,2,0
+            const boneRoot = new THREE.Bone(); boneRoot.position.set(0, 0, 0);
+            const boneTip  = new THREE.Bone(); boneTip.position.set(0, 1, 0);
+            boneRoot.add(boneTip);
+
+            const skeleton = new THREE.Skeleton([boneRoot, boneTip]);
+            mesh.add(boneRoot);
+            mesh.bind(skeleton);
+            mesh.position.set(0, 0, 0);
+            scene.add(mesh);
+
+            // Add SkeletonHelper
+            const helper = new THREE.SkeletonHelper(mesh);
+            scene.add(helper);
+
+            // Animate: wave the tip bone
+            const kf = new THREE.QuaternionKeyframeTrack(
+                '.bones[1].quaternion',
+                [0, 0.5, 1],
+                [
+                    0, 0, 0, 1,
+                    0, 0, Math.sin(Math.PI / 8), Math.cos(Math.PI / 8),
+                    0, 0, 0, 1
+                ]
+            );
+            const clip = new THREE.AnimationClip('wave', 1, [kf]);
+            mixer = new THREE.AnimationMixer(mesh);
+            mixer.clipAction(clip).play();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            if (mixer) mixer.update(delta);
+            renderer.render(scene, camera);
+
+            const now = performance.now();
+            if (startTime === null) startTime = now;
+            frameCount++;
+            if (frameCount % 300 === 0) {
+                const fps = 1000 * frameCount / (now - startTime);
+                console.log(`frame ${frameCount}  fps: ${fps.toFixed(1)}`);
+            }
+            if ((now - startTime) / 1000 > 60 && shouldLog) {
+                shouldLog = false;
+                const fps = 1000 * frameCount / (now - startTime);
+                console.log('1min result', fps.toFixed(1), 'fps');
+            }
+        }
+    </script>
+</body>
+
+</html>

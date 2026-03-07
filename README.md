@@ -165,3 +165,11 @@ Average frame time (ms) of different frameworks and different 3D model complexit
 
 启动测评的办法：
 D:\TMC\measureWebXR>npx http-server -c-1 -p 8080
+
+启动ReactThree 
+在项目目录启动：
+cd evaluateReactThreeFiber/multigltf
+npm start
+浏览器打开（一般是 3000 端口）：
+平铺模式（默认）：http://localhost:3000/
+scenegraph 模式：http://localhost:3000/?mode=scenegraph&levels=4&n=32
