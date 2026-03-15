@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Skeletal Animation - Babylon.js</title>
+  <style>
+    body { margin: 0; overflow: hidden; font-family: monospace; }
+    canvas { width: 100%; height: 100%; }
+    #info {
+      position: absolute; top: 10px; left: 10px; color: #fff;
+      background: rgba(0,0,0,0.55); padding: 8px; border-radius: 4px; line-height: 1.6;
+    }
+    #controls {
+      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 8px;
+    }
+    button {
+      padding: 6px 14px; font-size: 13px; cursor: pointer;
+      border-radius: 4px; border: 1px solid #888; background: rgba(0,0,0,0.6); color: #fff;
+    }
+    button.active { background: rgba(80,160,255,0.7); }
+  </style>
+  <script src="./src/babylon.js"></script>
+  <script src="./src/babylon.glTFFileLoader.js"></script>
+</head>
+<body>
+  <div id="info">
+    Skeletal Animation (Babylon.js AnimationGroup)<br>
+    <span id="status">Loading model...</span>
+  </div>
+  <div id="controls">
+    <button id="btn-idle" class="active">Idle</button>
+    <button id="btn-walk">Walk</button>
+    <button id="btn-run">Run</button>
+  </div>
+  <canvas id="renderCanvas"></canvas>
+
+  <script>
+    const MODEL_URL = '../gltf/Soldier/Soldier.glb';
+    let animationGroups = {};
+    let currentGroup = null;
+    let loaded = false;
+    let frameCount = 0, startTime = null, shouldLog = true;
+
+    function switchAnimation(name) {
+      if (!animationGroups[name]) { console.warn('No animation:', name); return; }
+      if (currentGroup) currentGroup.stop();
+      currentGroup = animationGroups[name];
+      currentGroup.start(true, 1.0, currentGroup.from, currentGroup.to);
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btn-' + name.toLowerCase()).classList.add('active');
+    }
+
+    document.getElementById('btn-idle').onclick = () => switchAnimation('Idle');
+    document.getElementById('btn-walk').onclick = () => switchAnimation('Walk');
+    document.getElementById('btn-run').onclick  = () => switchAnimation('Run');
+
+    const canvas = document.getElementById('renderCanvas');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const engine = new BABYLON.Engine(canvas, { antialias: true, adaptToDeviceRatio: true });
+    const scene  = new BABYLON.Scene(engine);
+    scene.clearColor = new BABYLON.Color4(0.2, 0.27, 0.33, 1);
+    scene.fogMode = BABYLON.Scene.FOGMODE_LINEAR;
+    scene.fogColor = new BABYLON.Color3(0.2, 0.27, 0.33);
+    scene.fogStart = 10; scene.fogEnd = 50;
+
+    const camera = new BABYLON.ArcRotateCamera('cam', -Math.PI / 2, Math.PI / 3, 6, new BABYLON.Vector3(0, 1, 0), scene);
+    camera.attachControl(canvas, true);
+
+    // Lights
+    const hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 1, 0), scene);
+    hemi.intensity = 0.6;
+    const dir  = new BABYLON.DirectionalLight('dir',  new BABYLON.Vector3(-5, -10, -5), scene);
+    dir.intensity = 0.8;
+
+    // Ground
+    const ground = BABYLON.MeshBuilder.CreateGround('ground', { width: 20, height: 20 }, scene);
+    const groundMat = new BABYLON.StandardMaterial('groundMat', scene);
+    groundMat.diffuseColor = new BABYLON.Color3(0.33, 0.4, 0.47);
+    ground.material = groundMat;
+
+    // Load Soldier.glb
+    BABYLON.SceneLoader.ImportMesh('', '../gltf/Soldier/', 'Soldier.glb', scene,
+      function (meshes, particleSystems, skeletons, animGroups) {
+        meshes.forEach(m => { m.shadow = true; });
+
+        // Index animation groups by name
+        animGroups.forEach(ag => {
+          animationGroups[ag.name] = ag;
+          console.log('Animation group:', ag.name);
+        });
+
+        const names = Object.keys(animationGroups);
+        document.getElementById('status').textContent = 'Clips: ' + names.join(', ');
+
+        // Stop all groups first then play first
+        animGroups.forEach(ag => ag.stop());
+        if (names.length > 0) {
+          const first = animationGroups[names[0]];
+          currentGroup = first;
+          first.start(true, 1.0, first.from, first.to);
+        }
+
+        loaded = true;
+        console.log('scene loaded time', performance.now());
+      },
+      null,
+      function (scene, msg) {
+        document.getElementById('status').textContent = 'Load error: ' + msg;
+        loaded = true;
+      }
+    );
+
+    engine.runRenderLoop(function () {
+      scene.render();
+      if (loaded) {
+        const time = performance.now();
+        if (startTime === null) startTime = time;
+        frameCount += 1;
+        if (frameCount % 300 === 0) {
+          const fps = 1000 * frameCount / (time - startTime);
+          console.log('frame', frameCount, fps.toFixed(1), 'fps');
+        }
+        if ((time - startTime) / 1000 > 60 && shouldLog) {
+          shouldLog = false;
+          const fps = 1000 * frameCount / (time - startTime);
+          console.log('1min result', fps.toFixed(1), 'fps');
+        }
+      }
+    });
+
+    window.addEventListener('resize', () => engine.resize());
+  </script>
+</body>
+</html>

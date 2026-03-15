@@ -1,0 +1,189 @@
+<html>
+<head>
+  <title>Particle Effects - A-Frame</title>
+  <script src="./src/aframe.min.js"></script>
+  <style>
+    body { margin: 0; background: #000; overflow: hidden; font-family: monospace; }
+    #info {
+      position: absolute; top: 10px; left: 10px; color: #fff;
+      background: rgba(0,0,0,0.5); padding: 8px; border-radius: 4px;
+    }
+    #controls {
+      position: absolute; top: 10px; right: 10px; color: #fff;
+      background: rgba(0,0,0,0.6); padding: 10px; border-radius: 4px;
+    }
+    label { display: block; margin: 4px 0; }
+    input[type=range] { width: 160px; }
+  </style>
+</head>
+<body>
+  <div id="info">Particle Effects (A-Frame)<br><span id="count-display"></span></div>
+  <div id="controls">
+    <label>Mode:
+      <select id="mode-select">
+        <option value="smoke">Smoke</option>
+        <option value="fire">Fire</option>
+      </select>
+    </label>
+    <label>Particle Count: <span id="slider-val">5000</span>
+      <input type="range" id="particle-count" min="100" max="50000" step="100" value="5000">
+    </label>
+    <button id="btn-start">Start</button>
+  </div>
+
+  <script>
+    let PARTICLE_COUNT = 5000;
+    let frameCount = 0, startTime = null, shouldLog = true;
+
+    document.getElementById('particle-count').addEventListener('input', (e) => {
+      PARTICLE_COUNT = parseInt(e.target.value);
+      document.getElementById('slider-val').textContent = PARTICLE_COUNT;
+    });
+
+    AFRAME.registerComponent('benchmark-particle-system', {
+      schema: {
+        mode: { type: 'string', default: 'smoke' },
+        count: { type: 'int', default: 5000 }
+      },
+
+      init: function () {
+        this.points = null;
+        this.userData = null;
+        this.clock = new THREE.Clock();
+        this.el.object3D.position.set(0, 1.2, -8);
+        this.createParticles(this.data.mode, this.data.count);
+      },
+
+      update: function () {
+        this.createParticles(this.data.mode, this.data.count);
+      },
+
+      createParticles: function (mode, count) {
+        const root3D = this.el.object3D;
+        if (this.points) {
+          root3D.remove(this.points);
+          this.points.geometry.dispose();
+          this.points.material.dispose();
+        }
+
+        const positions = new Float32Array(count * 3);
+        const colors    = new Float32Array(count * 3);
+        const velocities = new Float32Array(count * 3);
+        const lifetimes  = new Float32Array(count);
+
+        for (let i = 0; i < count; i++) {
+          positions[i * 3]     = (Math.random() - 0.5) * 2.2;
+          positions[i * 3 + 1] = 0;
+          positions[i * 3 + 2] = (Math.random() - 0.5) * 2.2;
+
+          velocities[i * 3]     = (Math.random() - 0.5) * 0.08;
+          velocities[i * 3 + 1] = Math.random() * 0.16 + 0.05;
+          velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.08;
+
+          lifetimes[i] = Math.random();
+
+          if (mode === 'fire') {
+            colors[i * 3]     = 1.0;
+            colors[i * 3 + 1] = Math.random() * 0.5;
+            colors[i * 3 + 2] = 0.0;
+          } else {
+            const v = Math.random() * 0.4 + 0.3;
+            colors[i * 3] = v; colors[i * 3 + 1] = v; colors[i * 3 + 2] = v;
+          }
+        }
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setAttribute('color',    new THREE.BufferAttribute(colors,    3));
+
+        const mat = new THREE.PointsMaterial({
+          size: mode === 'fire' ? 0.32 : 0.24,
+          vertexColors: true,
+          transparent: true,
+          opacity: mode === 'fire' ? 0.95 : 0.72,
+          depthWrite: false,
+          blending: mode === 'fire' ? THREE.AdditiveBlending : THREE.NormalBlending,
+          sizeAttenuation: true
+        });
+
+        this.points = new THREE.Points(geo, mat);
+        this.points.frustumCulled = false;
+        this.points.position.set(0, 0, 0);
+        this.userData = { velocities, lifetimes, mode, count };
+        root3D.add(this.points);
+
+        document.getElementById('count-display').textContent = 'Particles: ' + count + '  Mode: ' + mode;
+      },
+
+      tick: function () {
+        if (!this.points) return;
+        const delta = this.clock.getDelta();
+        const { velocities, lifetimes, mode, count } = this.userData;
+        const pos = this.points.geometry.attributes.position;
+        const col = this.points.geometry.attributes.color;
+
+        for (let i = 0; i < count; i++) {
+          lifetimes[i] += delta * 0.65;
+          if (lifetimes[i] > 1.0) {
+            lifetimes[i] = 0;
+            pos.array[i * 3]     = (Math.random() - 0.5) * 2.2;
+            pos.array[i * 3 + 1] = 0;
+            pos.array[i * 3 + 2] = (Math.random() - 0.5) * 2.2;
+            velocities[i * 3]     = (Math.random() - 0.5) * 0.08;
+            velocities[i * 3 + 1] = Math.random() * 0.16 + 0.05;
+            velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.08;
+          } else {
+            pos.array[i * 3]     += velocities[i * 3];
+            pos.array[i * 3 + 1] += velocities[i * 3 + 1];
+            pos.array[i * 3 + 2] += velocities[i * 3 + 2];
+
+            const age = lifetimes[i];
+            if (mode === 'fire') {
+              col.array[i * 3 + 1] = Math.max(0, (0.5 - age) * 1.0);
+            } else {
+              const v = 0.3 + age * 0.4;
+              col.array[i * 3] = v; col.array[i * 3 + 1] = v; col.array[i * 3 + 2] = v;
+            }
+          }
+        }
+        pos.needsUpdate = true;
+        col.needsUpdate = true;
+
+        // FPS logging
+        const now = performance.now();
+        if (startTime === null) startTime = now;
+        frameCount++;
+        if (frameCount % 300 === 0) {
+          const fps = 1000 * frameCount / (now - startTime);
+          console.log('frame', frameCount, 'fps:', fps.toFixed(1), 'particles:', PARTICLE_COUNT);
+        }
+        if ((now - startTime) / 1000 > 60 && shouldLog) {
+          shouldLog = false;
+          const fps = 1000 * frameCount / (now - startTime);
+          console.log('1min result', fps.toFixed(1), 'fps  particles:', PARTICLE_COUNT);
+        }
+      }
+    });
+
+    let particleEntity = null;
+
+    document.getElementById('btn-start').addEventListener('click', () => {
+      const sceneEl = document.querySelector('a-scene');
+      const mode = document.getElementById('mode-select').value;
+
+      if (!particleEntity) {
+        particleEntity = document.createElement('a-entity');
+        particleEntity.setAttribute('benchmark-particle-system', `mode: ${mode}; count: ${PARTICLE_COUNT}`);
+        sceneEl.appendChild(particleEntity);
+      } else {
+        frameCount = 0; startTime = null; shouldLog = true;
+        particleEntity.setAttribute('benchmark-particle-system', `mode: ${mode}; count: ${PARTICLE_COUNT}`);
+      }
+    });
+  </script>
+
+  <a-scene background="color: #000000">
+    <a-entity camera position="0 2.2 5.5" rotation="0 0 0"></a-entity>
+  </a-scene>
+</body>
+</html>

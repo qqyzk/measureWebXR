@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>GLTF Lighting - PlayCanvas</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+  <style>
+    body { margin: 0; overflow: hidden; font-family: monospace; }
+    #controls {
+      position: absolute; top: 12px; left: 12px; z-index: 10;
+      color: #fff; background: rgba(0,0,0,0.65); padding: 10px; border-radius: 6px;
+    }
+    #controls label, #controls select, #controls input { margin-right: 8px; }
+  </style>
+  <script src="./src/playcanvas-stable.min.js"></script>
+</head>
+<body>
+  <div id="controls">
+    <input id="button" type="button" value="start">
+    <label for="light-mode">light mode:</label>
+    <select id="light-mode">
+      <option value="ambient-directional">ambient + directional</option>
+      <option value="hemisphere-directional">hemisphere + directional (approx)</option>
+      <option value="point">point</option>
+      <option value="spot">spot</option>
+    </select>
+    <label for="shading-mode">shading:</label>
+    <select id="shading-mode">
+      <option value="gltf-original">gltf-original</option>
+      <option value="phong">phong</option>
+      <option value="pbr">pbr</option>
+    </select>
+  </div>
+  <canvas id="application"></canvas>
+
+  <script>
+    let LIGHT_MODE = 'ambient-directional';
+    let SHADING_MODE = 'gltf-original';
+    let loaded = false;
+    let app;
+    let lightEntities = [];
+    let modelEntities = [];
+
+    let startFlag = true, frameCount = 0, startTime = null, shouldLog = true;
+
+    function resetMetrics() {
+      startFlag = true; frameCount = 0; startTime = null; shouldLog = true;
+    }
+
+    function clearLights() {
+      lightEntities.forEach(e => e.destroy());
+      lightEntities = [];
+    }
+
+    function addLight(name, type, color, intensity, posOrDir, extraProps) {
+      const e = new pc.Entity(name);
+      const props = Object.assign({ type, color: new pc.Color(color[0], color[1], color[2]), intensity }, extraProps || {});
+      e.addComponent('light', props);
+      if (posOrDir) e.setPosition(posOrDir[0], posOrDir[1], posOrDir[2]);
+      app.root.addChild(e);
+      lightEntities.push(e);
+      return e;
+    }
+
+    function collectMeshInstances(root) {
+      const list = [];
+      root.forEach(node => {
+        if (!node.render || !node.render.meshInstances) return;
+        node.render.meshInstances.forEach(mi => list.push(mi));
+      });
+      return list;
+    }
+
+    function createShadedMaterial(original, mode) {
+      if (mode === 'gltf-original') return original;
+
+      const mat = new pc.StandardMaterial();
+      mat.diffuse = original.diffuse ? original.diffuse.clone() : new pc.Color(1, 1, 1);
+      mat.opacity = original.opacity !== undefined ? original.opacity : 1;
+      mat.blendType = original.blendType;
+      mat.cull = original.cull;
+      mat.diffuseMap = original.diffuseMap || null;
+      mat.normalMap = original.normalMap || null;
+      mat.opacityMap = original.opacityMap || null;
+      mat.emissiveMap = original.emissiveMap || null;
+      mat.emissive = original.emissive ? original.emissive.clone() : new pc.Color(0, 0, 0);
+
+      if (mode === 'phong') {
+        mat.useMetalness = false;
+        mat.shininess = 64;
+        mat.specular = new pc.Color(0.35, 0.35, 0.35);
+      } else {
+        mat.useMetalness = true;
+        mat.metalness = 0.35;
+        mat.gloss = 0.55;
+      }
+
+      mat.update();
+      return mat;
+    }
+
+    function applyShading(mode) {
+      SHADING_MODE = mode;
+      modelEntities.forEach(entity => {
+        const meshInstances = collectMeshInstances(entity);
+        meshInstances.forEach(mi => {
+          if (!mi._originalMaterial) {
+            mi._originalMaterial = mi.material;
+          }
+          const original = mi._originalMaterial;
+          if (mi.material && mi.material !== original) {
+            mi.material.destroy();
+          }
+          mi.material = createShadedMaterial(original, mode);
+        });
+      });
+
+      if (loaded) resetMetrics();
+      console.log('shading mode switched:', mode);
+    }
+
+    function applyLighting(mode) {
+      LIGHT_MODE = mode;
+      clearLights();
+      app.scene.ambientLight = new pc.Color(0, 0, 0);
+
+      if (mode === 'ambient-directional') {
+        app.scene.ambientLight = new pc.Color(0.45, 0.45, 0.45);
+        const dir = addLight('dir', 'directional', [1, 1, 1], 1.8);
+        dir.setEulerAngles(45, -30, 0);
+
+      } else if (mode === 'hemisphere-directional') {
+        // Approximate hemisphere: ambient from above (warm) + fill from below (cool)
+        app.scene.ambientLight = new pc.Color(0.5, 0.5, 0.5);
+        const up = addLight('dirUp', 'directional', [1, 1, 1], 0.7, [0, 10, 0]);
+        up.setEulerAngles(50, -30, 0);
+        const down = addLight('dirDown', 'directional', [0.13, 0.2, 0.27], 0.3);
+        down.setEulerAngles(-30, 0, 0);
+        const dir  = addLight('dir', 'directional', [1, 1, 1], 1.4);
+        dir.setEulerAngles(40, -30, 0);
+
+      } else if (mode === 'point') {
+        app.scene.ambientLight = new pc.Color(0.2, 0.2, 0.2);
+        addLight('pt', 'omni', [1, 1, 1], 30, [0, 3, -6], { range: 80 });
+
+      } else if (mode === 'spot') {
+        app.scene.ambientLight = new pc.Color(0.15, 0.15, 0.15);
+        const spot = addLight('spot', 'spot', [1, 1, 1], 40, [0, 6, -6], {
+          range: 120,
+          innerConeAngle: 15,
+          outerConeAngle: 30
+        });
+        spot.setEulerAngles(70, 0, 0);
+      }
+
+      if (loaded) resetMetrics();
+      console.log('lighting mode switched:', mode);
+    }
+
+    document.getElementById('light-mode').addEventListener('change', (e) => {
+      if (app) applyLighting(e.target.value);
+    });
+
+    document.getElementById('shading-mode').addEventListener('change', (e) => {
+      if (app) applyShading(e.target.value);
+    });
+
+    document.getElementById('button').onclick = function () {
+      document.getElementById('button').disabled = true;
+      console.log('click time', performance.now() + performance.timeOrigin);
+
+      const canvas = document.getElementById('application');
+      app = new pc.Application(canvas);
+      app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);
+      app.setCanvasResolution(pc.RESOLUTION_AUTO);
+      window.addEventListener('resize', () => app.resizeCanvas());
+
+      // Camera
+      const camera = new pc.Entity('camera');
+      camera.addComponent('camera', { clearColor: new pc.Color(0, 0, 0) });
+      camera.setPosition(0, 0, 3);
+      app.root.addChild(camera);
+
+      applyLighting(document.getElementById('light-mode').value);
+      app.start();
+
+      const url = '../gltf/Box/box.gltf';
+      const scale = 0.05;
+      const minx = -0.5, miny = -0.8, minz = -20;
+      const maxx = 0.5, maxy = 0.8, maxz = -3;
+      const edgeNum = 2;
+      const stepDenom = Math.max(1, edgeNum - 1);
+
+      app.assets.loadFromUrl(url, 'container', function (err, asset) {
+        if (err) { console.error(err); return; }
+        const template = asset.resource.instantiateRenderEntity({ castShadows: true });
+        for (let i = 0; i < edgeNum; ++i) {
+          for (let j = 0; j < edgeNum; ++j) {
+            for (let k = 0; k < edgeNum; ++k) {
+              const curx = minx + (maxx - minx) / stepDenom * i;
+              const cury = miny + (maxy - miny) / stepDenom * j;
+              const curz = minz + (maxz - minz) / stepDenom * k;
+              const entity = template.clone();
+              entity.setPosition(curx, cury, curz);
+              entity.setLocalScale(scale, scale, scale);
+              app.root.addChild(entity);
+              modelEntities.push(entity);
+            }
+          }
+        }
+        template.destroy();
+        applyShading(document.getElementById('shading-mode').value);
+        loaded = true;
+        resetMetrics();
+        console.log('scene loaded time', performance.now() + performance.timeOrigin);
+      });
+
+      app.on('update', function () {
+        if (loaded) {
+          const time = performance.now();
+          if (startFlag) {
+            startTime = time; startFlag = false;
+            console.log('startTime', time + performance.timeOrigin, 'light:', LIGHT_MODE);
+          }
+          frameCount += 1;
+          if (frameCount % 1000 === 0) {
+            const fps = 1000 * frameCount / (time - startTime);
+            console.log('light:', LIGHT_MODE, frameCount, fps.toFixed(1), 'fps');
+          }
+          if ((time - startTime) / 1000 > 60 && shouldLog) {
+            shouldLog = false;
+            const fps = 1000 * frameCount / (time - startTime);
+            console.log('1min', 'light:', LIGHT_MODE, (time - startTime) / 1000, frameCount, fps.toFixed(1), 'fps');
+          }
+        }
+      });
+    };
+  </script>
+</body>
+</html>

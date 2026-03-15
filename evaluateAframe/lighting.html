@@ -1,0 +1,253 @@
+<html>
+<head>
+  <title>GLTF Lighting - A-Frame</title>
+  <script src="./src/aframe.min.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; font-family: monospace; }
+    #controls {
+      position: absolute; top: 12px; left: 12px; z-index: 10;
+      color: #fff; background: rgba(0,0,0,0.65); padding: 10px; border-radius: 6px;
+    }
+    #controls label, #controls select, #controls input { margin-right: 8px; }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <input id="button" type="button" value="start">
+    <label for="light-mode">light mode:</label>
+    <select id="light-mode">
+      <option value="ambient-directional">ambient + directional</option>
+      <option value="hemisphere-directional">hemisphere + directional</option>
+      <option value="point">point</option>
+      <option value="spot">spot</option>
+    </select>
+    <label for="shading-mode">shading:</label>
+    <select id="shading-mode">
+      <option value="gltf-original">gltf-original</option>
+      <option value="phong">phong</option>
+      <option value="pbr">pbr</option>
+    </select>
+  </div>
+
+  <script>
+    let loaded = false;
+    let currentLightMode = 'ambient-directional';
+    let currentShadingMode = 'gltf-original';
+    const convertedMaterialCache = new Map();
+
+    AFRAME.registerComponent('measure-fps', {
+      schema: {
+        startFlag: { type: 'bool', default: true },
+        frameCount: { type: 'int', default: 0 },
+        startTime: { type: 'float', default: 0 },
+        shouldLog: { type: 'bool', default: true }
+      },
+      init: function () {
+        this.data.startFlag = true;
+        this.data.frameCount = 0;
+        this.data.shouldLog = true;
+      },
+      tock: function () {
+        if (!loaded) return;
+        let time = performance.now();
+        if (this.data.startFlag) {
+          this.data.startTime = time;
+          this.data.startFlag = false;
+          console.log('startTime', time + performance.timeOrigin, 'light:', currentLightMode);
+        }
+        this.data.frameCount += 1;
+        if (this.data.frameCount % 1000 === 0) {
+          let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
+          console.log('light:', currentLightMode, this.data.frameCount, fps.toFixed(1), 'fps');
+        }
+        if ((time - this.data.startTime) / 1000 > 60 && this.data.shouldLog) {
+          this.data.shouldLog = false;
+          let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
+          console.log('1min', 'light:', currentLightMode, (time - this.data.startTime) / 1000, this.data.frameCount, fps.toFixed(1), 'fps');
+        }
+      }
+    });
+
+    AFRAME.registerComponent('multigltf-lighting', {
+      init: function () {
+        const scale = 0.05;
+        const sceneEl = document.querySelector('a-scene');
+        this.el.addEventListener('model-loaded', () => {
+          const minx = -0.5, miny = -0.8, minz = -20;
+          const maxx = 0.5, maxy = 0.8, maxz = -3;
+          const edgeNum = 2;
+          const stepDenom = Math.max(1, edgeNum - 1);
+          for (let i = 0; i < edgeNum; ++i) {
+            for (let j = 0; j < edgeNum; ++j) {
+              for (let k = 0; k < edgeNum; ++k) {
+                const curx = minx + (maxx - minx) / stepDenom * i;
+                const cury = miny + (maxy - miny) / stepDenom * j;
+                const curz = minz + (maxz - minz) / stepDenom * k;
+                const entity = document.createElement('a-entity');
+                entity.classList.add('model-instance');
+                entity.setAttribute('gltf-model', '#gltfID');
+                entity.setAttribute('position', curx + ' ' + cury + ' ' + curz);
+                entity.setAttribute('scale', scale + ' ' + scale + ' ' + scale);
+                entity.addEventListener('model-loaded', () => {
+                  rememberOriginalMaterials(entity.object3D);
+                  if (currentShadingMode !== 'gltf-original') {
+                    applyShadingToRoot(entity.object3D, currentShadingMode);
+                  }
+                });
+                sceneEl.appendChild(entity);
+              }
+            }
+          }
+          loaded = true;
+          console.log('scene loaded time', performance.now() + performance.timeOrigin);
+        });
+      }
+    });
+
+    function resetMetrics() {
+      const scene = document.querySelector('a-scene');
+      if (scene && scene.components['measure-fps']) {
+        const d = scene.components['measure-fps'].data;
+        d.startFlag = true;
+        d.frameCount = 0;
+        d.startTime = 0;
+        d.shouldLog = true;
+      }
+    }
+
+    function applyLighting(mode) {
+      currentLightMode = mode;
+      document.querySelectorAll('.dynamic-light').forEach(el => el.remove());
+      const sceneEl = document.querySelector('a-scene');
+
+      function addLight(attrs) {
+        const el = document.createElement('a-light');
+        el.classList.add('dynamic-light');
+        for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+        sceneEl.appendChild(el);
+      }
+
+      if (mode === 'ambient-directional') {
+        addLight({ type: 'ambient', color: '#ffffff', intensity: 0.45 });
+        addLight({ type: 'directional', color: '#ffffff', intensity: 1.8, position: '2 5 4' });
+      } else if (mode === 'hemisphere-directional') {
+        addLight({ type: 'ambient', color: '#7f8fa0', intensity: 0.38 });
+        addLight({ type: 'directional', color: '#ffffff', intensity: 0.7, position: '0 8 0' });
+        addLight({ type: 'directional', color: '#223344', intensity: 0.45, position: '0 -5 0' });
+        addLight({ type: 'directional', color: '#ffffff', intensity: 1.4, position: '3 6 4' });
+      } else if (mode === 'point') {
+        addLight({ type: 'ambient', color: '#ffffff', intensity: 0.2 });
+        addLight({ type: 'point', color: '#ffffff', intensity: 3, distance: 80, position: '0 3 -6' });
+      } else if (mode === 'spot') {
+        addLight({ type: 'ambient', color: '#ffffff', intensity: 0.15 });
+        addLight({ type: 'spot', color: '#ffffff', intensity: 4, distance: 120, angle: 30, penumbra: 0.35, position: '0 6 -6' });
+      }
+
+      if (loaded) resetMetrics();
+      console.log('lighting mode switched:', mode);
+    }
+
+    function rememberOriginalMaterials(root) {
+      root.traverse((node) => {
+        if (!node.isMesh || !node.material) return;
+        if (node.userData.originalMaterial !== undefined) return;
+        node.userData.originalMaterial = node.material;
+      });
+    }
+
+    function convertSingleMaterial(src, mode) {
+      if (mode === 'gltf-original') return src;
+      const cacheKey = mode + ':' + src.uuid;
+      if (convertedMaterialCache.has(cacheKey)) {
+        return convertedMaterialCache.get(cacheKey);
+      }
+
+      let mat;
+      if (mode === 'phong') {
+        mat = new THREE.MeshPhongMaterial({
+          color: src.color ? src.color.clone() : new THREE.Color(0xffffff),
+          map: src.map || null,
+          normalMap: src.normalMap || null,
+          emissive: src.emissive ? src.emissive.clone() : new THREE.Color(0x000000),
+          emissiveMap: src.emissiveMap || null,
+          transparent: !!src.transparent,
+          opacity: src.opacity !== undefined ? src.opacity : 1,
+          side: src.side !== undefined ? src.side : THREE.FrontSide
+        });
+        mat.specular = new THREE.Color(0x555555);
+        mat.shininess = 40;
+      } else {
+        mat = new THREE.MeshStandardMaterial({
+          color: src.color ? src.color.clone() : new THREE.Color(0xffffff),
+          map: src.map || null,
+          normalMap: src.normalMap || null,
+          emissive: src.emissive ? src.emissive.clone() : new THREE.Color(0x000000),
+          emissiveMap: src.emissiveMap || null,
+          roughness: 0.42,
+          metalness: 0.58,
+          transparent: !!src.transparent,
+          opacity: src.opacity !== undefined ? src.opacity : 1,
+          side: src.side !== undefined ? src.side : THREE.FrontSide
+        });
+      }
+
+      mat.needsUpdate = true;
+      convertedMaterialCache.set(cacheKey, mat);
+      return mat;
+    }
+
+    function convertMaterial(src, mode) {
+      if (Array.isArray(src)) {
+        return src.map((item) => convertSingleMaterial(item, mode));
+      }
+      return convertSingleMaterial(src, mode);
+    }
+
+    function applyShadingToRoot(root, mode) {
+      root.traverse((node) => {
+        if (!node.isMesh) return;
+        const original = node.userData.originalMaterial;
+        if (original === undefined) return;
+        node.material = convertMaterial(original, mode);
+      });
+    }
+
+    function applyShading(mode) {
+      currentShadingMode = mode;
+      document.querySelectorAll('.model-instance').forEach((entity) => {
+        if (!entity.object3D) return;
+        applyShadingToRoot(entity.object3D, mode);
+      });
+      if (loaded) resetMetrics();
+      console.log('shading mode switched:', mode);
+    }
+
+    document.getElementById('light-mode').addEventListener('change', (e) => {
+      applyLighting(e.target.value);
+    });
+
+    document.getElementById('shading-mode').addEventListener('change', (e) => {
+      applyShading(e.target.value);
+    });
+
+    document.getElementById('button').addEventListener('click', () => {
+      document.getElementById('button').disabled = true;
+      console.log('click time', performance.now() + performance.timeOrigin);
+      applyLighting(document.getElementById('light-mode').value);
+    });
+
+    document.querySelector('a-scene').addEventListener('loaded', () => {
+      applyLighting(document.getElementById('light-mode').value);
+      applyShading(document.getElementById('shading-mode').value);
+    });
+  </script>
+
+  <a-scene background="color: black" measure-fps light="defaultLightsEnabled: false">
+    <a-assets>
+      <a-asset-item id="gltfID" src="../gltf/Box/box.gltf"></a-asset-item>
+    </a-assets>
+    <a-entity id="gltfmodel" visible="false" gltf-model="#gltfID" multigltf-lighting></a-entity>
+    <a-entity camera position="0 0 0"></a-entity>
+  </a-scene>
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Skeletal Animation - PlayCanvas</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+  <style>
+    body { margin: 0; overflow: hidden; font-family: monospace; }
+    #info {
+      position: absolute; top: 10px; left: 10px; color: #fff;
+      background: rgba(0,0,0,0.55); padding: 8px; border-radius: 4px; line-height: 1.6;
+    }
+    #controls {
+      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 8px;
+    }
+    button {
+      padding: 6px 14px; font-size: 13px; cursor: pointer;
+      border-radius: 4px; border: 1px solid #888; background: rgba(0,0,0,0.6); color: #fff;
+    }
+    button.active { background: rgba(80,160,255,0.7); }
+  </style>
+  <script src="./src/playcanvas-stable.min.js"></script>
+</head>
+<body>
+  <div id="info">
+    Skeletal Animation (PlayCanvas anim component)<br>
+    <span id="status">Loading model...</span>
+  </div>
+  <div id="controls">
+    <button id="btn-idle" class="active">Idle</button>
+    <button id="btn-walk">Walk</button>
+    <button id="btn-run">Run</button>
+  </div>
+  <canvas id="application"></canvas>
+
+  <script>
+    const MODEL_URL = '../gltf/Soldier/Soldier.glb';
+    let loaded = false;
+    let frameCount = 0, startTime = null, shouldLog = true;
+    let soldierEntity = null;
+    let animClipNames = [];
+    let activeClipName = '';
+
+    const canvas = document.getElementById('application');
+    const app = new pc.Application(canvas);
+    app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);
+    app.setCanvasResolution(pc.RESOLUTION_AUTO);
+    window.addEventListener('resize', () => app.resizeCanvas());
+
+    // Camera
+    const camera = new pc.Entity('camera');
+    camera.addComponent('camera', { clearColor: new pc.Color(0.2, 0.27, 0.33) });
+    camera.setPosition(1, 2, 5);
+    camera.lookAt(new pc.Vec3(0, 1, 0));
+    app.root.addChild(camera);
+
+    // Lights
+    const hemi = new pc.Entity('hemi');
+    hemi.addComponent('light', { type: 'directional', color: new pc.Color(1, 1, 1), intensity: 0.6 });
+    hemi.setEulerAngles(30, 0, 0);
+    app.root.addChild(hemi);
+    app.scene.ambientLight = new pc.Color(0.25, 0.25, 0.25);
+
+    const dir = new pc.Entity('dir');
+    dir.addComponent('light', { type: 'directional', color: new pc.Color(1, 1, 1), intensity: 0.8 });
+    dir.setEulerAngles(45, -30, 0);
+    app.root.addChild(dir);
+
+    // Ground
+    const ground = new pc.Entity('ground');
+    ground.addComponent('render', { type: 'plane' });
+    ground.setLocalScale(20, 1, 20);
+    const groundMat = new pc.StandardMaterial();
+    groundMat.diffuse = new pc.Color(0.33, 0.4, 0.47);
+    groundMat.update();
+    ground.render.material = groundMat;
+    app.root.addChild(ground);
+
+    app.start();
+
+    function switchClip(name) {
+      if (!soldierEntity || !soldierEntity.anim) return;
+      if (animClipNames.indexOf(name) === -1) { console.warn('No clip:', name); return; }
+      try {
+        soldierEntity.anim.baseLayer.transition(name, 0.3);
+        activeClipName = name;
+      } catch (e) {
+        console.warn('transition failed:', e);
+      }
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btn-' + name.toLowerCase()).classList.add('active');
+    }
+
+    document.getElementById('btn-idle').onclick = () => switchClip('Idle');
+    document.getElementById('btn-walk').onclick = () => switchClip('Walk');
+    document.getElementById('btn-run').onclick  = () => switchClip('Run');
+
+    app.assets.loadFromUrl(MODEL_URL, 'container', function (err, asset) {
+      if (err) {
+        document.getElementById('status').textContent = 'Load error: ' + err;
+        loaded = true;
+        return;
+      }
+
+      soldierEntity = asset.resource.instantiateRenderEntity({ castShadows: true });
+      app.root.addChild(soldierEntity);
+
+      const animAssets = asset.resource.animations;
+      if (animAssets && animAssets.length > 0) {
+        soldierEntity.addComponent('anim', { activate: true });
+
+        animAssets.forEach(animAsset => {
+          const track = animAsset.resource;
+          animClipNames.push(track.name);
+          soldierEntity.anim.assignAnimation(track.name, track);
+          console.log('Animation clip:', track.name);
+        });
+
+        document.getElementById('status').textContent = 'Clips: ' + animClipNames.join(', ');
+
+        // Play first clip
+        if (animClipNames.length > 0) {
+          activeClipName = animClipNames[0];
+          try { soldierEntity.anim.baseLayer.transition(activeClipName, 0); } catch (e) { console.warn(e); }
+        }
+      } else {
+        document.getElementById('status').textContent = 'No animations in model';
+      }
+
+      loaded = true;
+      console.log('scene loaded time', performance.now());
+    });
+
+    app.on('update', function () {
+      if (!loaded) return;
+      const time = performance.now();
+      if (startTime === null) startTime = time;
+      frameCount++;
+      if (frameCount % 300 === 0) {
+        const fps = 1000 * frameCount / (time - startTime);
+        console.log('frame', frameCount, fps.toFixed(1), 'fps');
+      }
+      if ((time - startTime) / 1000 > 60 && shouldLog) {
+        shouldLog = false;
+        const fps = 1000 * frameCount / (time - startTime);
+        console.log('1min result', fps.toFixed(1), 'fps');
+      }
+    });
+  </script>
+</body>
+</html>

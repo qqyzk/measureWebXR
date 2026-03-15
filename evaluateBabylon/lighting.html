@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>GLTF Lighting - Babylon.js</title>
+  <style>
+    body { margin: 0; overflow: hidden; font-family: monospace; }
+    canvas { width: 100%; height: 100%; }
+    #controls {
+      position: absolute; top: 12px; left: 12px; z-index: 10;
+      color: #fff; background: rgba(0,0,0,0.65); padding: 10px; border-radius: 6px;
+    }
+    #controls label, #controls select, #controls input { margin-right: 8px; }
+  </style>
+  <script src="./src/babylon.js"></script>
+  <script src="./src/babylon.glTFFileLoader.js"></script>
+</head>
+<body>
+  <div id="controls">
+    <input id="button" type="button" value="start">
+    <label for="light-mode">light mode:</label>
+    <select id="light-mode">
+      <option value="ambient-directional">ambient + directional</option>
+      <option value="hemisphere-directional">hemisphere + directional</option>
+      <option value="point">point</option>
+      <option value="spot">spot</option>
+    </select>
+    <label for="shading-mode">shading:</label>
+    <select id="shading-mode">
+      <option value="gltf-original">gltf-original</option>
+      <option value="phong">phong</option>
+      <option value="pbr">pbr</option>
+    </select>
+  </div>
+  <canvas id="renderCanvas"></canvas>
+
+  <script>
+    let LIGHT_MODE = 'ambient-directional';
+    let SHADING_MODE = 'gltf-original';
+    const MODEL_NAME = 'BoxTextured';
+    const MODEL_TYPE = 'gltf';
+    const MODEL_COUNT_EDGE = 16;
+    let loaded = false;
+    let lights = [];
+    let scene, engine;
+    let meshList = [];
+    let generatedMaterials = [];
+
+    let startFlag = true, frameCount = 0, startTime = null, shouldLog = true;
+
+    function resetMetrics() {
+      startFlag = true; frameCount = 0; startTime = null; shouldLog = true;
+    }
+
+    function clearLights() {
+      lights.forEach(l => l.dispose());
+      lights = [];
+    }
+
+    function disposeGeneratedMaterials() {
+      generatedMaterials.forEach(m => m.dispose());
+      generatedMaterials = [];
+    }
+
+    function rememberOriginalMaterials() {
+      meshList.forEach(mesh => {
+        if (!mesh.material) return;
+        if (mesh.metadata && mesh.metadata.originalMaterial) return;
+        mesh.metadata = mesh.metadata || {};
+        mesh.metadata.originalMaterial = mesh.material;
+      });
+    }
+
+    function makePhongMaterialFrom(original, meshName) {
+      const mat = new BABYLON.StandardMaterial('phong-' + meshName, scene);
+      const baseColor = original.albedoColor || original.diffuseColor;
+      if (baseColor) {
+        mat.diffuseColor = baseColor.clone();
+      }
+      mat.specularColor = new BABYLON.Color3(0.35, 0.35, 0.35);
+      mat.specularPower = 64;
+      const texture = original.albedoTexture || original.baseTexture || original.diffuseTexture;
+      if (texture) {
+        mat.diffuseTexture = texture;
+      }
+      generatedMaterials.push(mat);
+      return mat;
+    }
+
+    function makePbrMaterialFrom(original, meshName) {
+      const mat = new BABYLON.PBRMaterial('pbr-' + meshName, scene);
+      const baseColor = original.albedoColor || original.diffuseColor;
+      if (baseColor) {
+        mat.albedoColor = baseColor.clone();
+      }
+      mat.metallic = 0.35;
+      mat.roughness = 0.45;
+      const texture = original.albedoTexture || original.baseTexture || original.diffuseTexture;
+      if (texture) {
+        mat.albedoTexture = texture;
+      }
+      generatedMaterials.push(mat);
+      return mat;
+    }
+
+    function applyShading(mode) {
+      SHADING_MODE = mode;
+      if (!meshList.length) return;
+
+      disposeGeneratedMaterials();
+
+      meshList.forEach((mesh, idx) => {
+        if (!mesh.metadata || !mesh.metadata.originalMaterial) return;
+        const original = mesh.metadata.originalMaterial;
+
+        if (mode === 'gltf-original') {
+          mesh.material = original;
+          return;
+        }
+
+        if (mode === 'phong') {
+          mesh.material = makePhongMaterialFrom(original, mesh.name || String(idx));
+          return;
+        }
+
+        if (mode === 'pbr') {
+          mesh.material = makePbrMaterialFrom(original, mesh.name || String(idx));
+        }
+      });
+
+      if (loaded) resetMetrics();
+      console.log('shading mode switched:', mode);
+    }
+
+    function applyLighting(mode) {
+      LIGHT_MODE = mode;
+      clearLights();
+
+      if (mode === 'ambient-directional') {
+        const ambient = new BABYLON.HemisphericLight('ambient', new BABYLON.Vector3(0, 1, 0), scene);
+        ambient.intensity = 0.45;
+        ambient.diffuse = new BABYLON.Color3(1, 1, 1);
+        ambient.groundColor = new BABYLON.Color3(1, 1, 1);
+        const dir = new BABYLON.DirectionalLight('dir', new BABYLON.Vector3(-2, -5, -4), scene);
+        dir.intensity = 1.8;
+        lights.push(ambient, dir);
+
+      } else if (mode === 'hemisphere-directional') {
+        const hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 1, 0), scene);
+        hemi.intensity = 0.7;
+        hemi.diffuse = new BABYLON.Color3(1, 1, 1);
+        hemi.groundColor = new BABYLON.Color3(0.13, 0.2, 0.27);
+        const dir = new BABYLON.DirectionalLight('dir', new BABYLON.Vector3(-3, -6, -4), scene);
+        dir.intensity = 1.4;
+        lights.push(hemi, dir);
+
+      } else if (mode === 'point') {
+        const ambient = new BABYLON.HemisphericLight('ambient', new BABYLON.Vector3(0, 1, 0), scene);
+        ambient.intensity = 0.2;
+        ambient.diffuse = new BABYLON.Color3(1, 1, 1);
+        ambient.groundColor = new BABYLON.Color3(1, 1, 1);
+        const point = new BABYLON.PointLight('point', new BABYLON.Vector3(0, 3, -6), scene);
+        point.intensity = 30;
+        point.range = 80;
+        lights.push(ambient, point);
+
+      } else if (mode === 'spot') {
+        const ambient = new BABYLON.HemisphericLight('ambient', new BABYLON.Vector3(0, 1, 0), scene);
+        ambient.intensity = 0.15;
+        ambient.diffuse = new BABYLON.Color3(1, 1, 1);
+        ambient.groundColor = new BABYLON.Color3(1, 1, 1);
+        const spot = new BABYLON.SpotLight('spot', new BABYLON.Vector3(0, 6, -6), new BABYLON.Vector3(0, -1, 0.5), Math.PI / 6, 2, scene);
+        spot.intensity = 40;
+        lights.push(ambient, spot);
+      }
+
+      if (loaded) resetMetrics();
+      console.log('lighting mode switched:', mode);
+    }
+
+    document.getElementById('light-mode').addEventListener('change', (e) => {
+      if (scene) applyLighting(e.target.value);
+    });
+
+    document.getElementById('shading-mode').addEventListener('change', (e) => {
+      if (scene) applyShading(e.target.value);
+    });
+
+    document.getElementById('button').onclick = function () {
+      document.getElementById('button').disabled = true;
+      console.log('click time', performance.now() + performance.timeOrigin);
+
+      const canvas = document.getElementById('renderCanvas');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      engine = new BABYLON.Engine(canvas, { antialias: true, adaptToDeviceRatio: true });
+
+      scene = new BABYLON.Scene(engine);
+      scene.clearColor = new BABYLON.Color4(0, 0, 0, 1);
+
+      // Camera
+      scene.createDefaultCameraOrLight(true, true, true);
+      scene.activeCamera.alpha += Math.PI;
+      scene.activeCamera.attachControl(canvas, true);
+
+      // Remove default light so mode switching is fully controlled by applyLighting.
+      scene.lights.slice().forEach(l => l.dispose());
+
+      // Apply initial lighting
+      applyLighting(document.getElementById('light-mode').value);
+
+      // Load models
+      let url = '../gltf/Box/box.gltf';
+      let scale = 0.05;
+      if (MODEL_NAME === 'Box' && MODEL_TYPE === 'gltf') {
+        url = '../gltf/Box/Box.gltf';
+        scale = 0.05;
+      } else if (MODEL_NAME === 'Box' && MODEL_TYPE === 'glb') {
+        url = '../gltf/Box/Box.glb';
+        scale = 0.05;
+      } else if (MODEL_NAME === 'BoxTextured' && MODEL_TYPE === 'gltf') {
+        url = '../gltf/BoxTextured4/BoxTextured.gltf';
+        scale = 0.05;
+      } else if (MODEL_NAME === 'BoxTextured' && MODEL_TYPE === 'glb') {
+        url = '../gltf/BoxTextured/BoxTextured.glb';
+        scale = 0.05;
+      }
+
+      const minx = -0.5, miny = -1.1, minz = -10;
+      const maxx = 0.5, maxy = 1.1, maxz = -2;
+      const edgeNum = MODEL_COUNT_EDGE;
+      const stepDenom = Math.max(1, edgeNum - 1);
+
+      BABYLON.SceneLoader.LoadAssetContainer(url, '', scene, function (container) {
+        for (let i = 0; i < edgeNum; ++i) {
+          for (let j = 0; j < edgeNum; ++j) {
+            for (let k = 0; k < edgeNum; ++k) {
+              const curx = minx + (maxx - minx) / stepDenom * i;
+              const cury = miny + (maxy - miny) / stepDenom * j;
+              const curz = minz + (maxz - minz) / stepDenom * k;
+              if (i === 0 && j === 0 && k === 0) {
+                container.meshes[0].scaling = new BABYLON.Vector3(scale, scale, -scale);
+                container.meshes[0].position = new BABYLON.Vector3(curx, cury, curz);
+              } else {
+                const mesh = container.meshes[0].clone();
+                mesh.scaling = new BABYLON.Vector3(scale, scale, -scale);
+                mesh.position = new BABYLON.Vector3(curx, cury, curz);
+                container.meshes.push(mesh);
+              }
+            }
+          }
+        }
+        container.addAllToScene();
+        meshList = scene.meshes.filter(m => m && m.material && m.getTotalVertices && m.getTotalVertices() > 0);
+        rememberOriginalMaterials();
+        applyShading(document.getElementById('shading-mode').value);
+        loaded = true;
+        resetMetrics();
+        console.log('scene loaded time', performance.now() + performance.timeOrigin);
+      });
+
+      engine.runRenderLoop(function () {
+        scene.render();
+        if (loaded) {
+          const time = performance.now();
+          if (startFlag) {
+            startTime = time; startFlag = false;
+            console.log('startTime', time + performance.timeOrigin, 'light:', LIGHT_MODE);
+          }
+          frameCount += 1;
+          if (frameCount % 1000 === 0) {
+            const fps = 1000 * frameCount / (time - startTime);
+            console.log('light:', LIGHT_MODE, frameCount, fps.toFixed(1), 'fps');
+          }
+          if ((time - startTime) / 1000 > 60 && shouldLog) {
+            shouldLog = false;
+            const fps = 1000 * frameCount / (time - startTime);
+            console.log('1min', 'light:', LIGHT_MODE, (time - startTime) / 1000, frameCount, fps.toFixed(1), 'fps');
+          }
+        }
+      });
+
+      window.addEventListener('resize', () => engine.resize());
+    };
+  </script>
+</body>
+</html>
