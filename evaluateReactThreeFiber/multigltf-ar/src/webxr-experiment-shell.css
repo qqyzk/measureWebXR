@@ -1,0 +1,203 @@
+/* WebXR 控制变量实验 — 与仓库 shared/webxr-experiment-shell.css 同步 */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  position: fixed;
+  inset: 0;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#xr-canvas-host {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+}
+
+#xr-canvas-host canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+#dom-overlay-root {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+}
+
+#dom-overlay-root .stats-wrap {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 110;
+}
+
+#dom-overlay-root .stats-wrap > * {
+  pointer-events: auto;
+}
+
+#dom-overlay-root .glass-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px 18px 18px;
+  pointer-events: auto;
+  z-index: 105;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 14px;
+  background: #0f172a;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4);
+}
+
+#dom-overlay-root .glass-dock-inner {
+  max-width: min(1100px, 100%);
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#dom-overlay-root .dock-title {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  margin-right: 8px;
+}
+
+#dom-overlay-root .toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+#dom-overlay-root label.chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  user-select: none;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+#dom-overlay-root label.chk input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  background: transparent;
+  cursor: pointer;
+  vertical-align: middle;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+#dom-overlay-root label.chk input[type="checkbox"]:checked {
+  background: #38bdf8;
+  border-color: #38bdf8;
+  box-shadow: inset 0 0 0 3px #0f172a;
+}
+
+#dom-overlay-root .run-btn-wrap {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+#dom-overlay-root .run-btn-spinner {
+  display: none;
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(248, 250, 252, 0.22);
+  border-top-color: #f8fafc;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  animation: wxr-run-loading 0.7s linear infinite;
+}
+
+#dom-overlay-root .glass-dock.running .run-btn-spinner {
+  display: block;
+}
+
+@keyframes wxr-run-loading {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+#dom-overlay-root .run-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  cursor: pointer;
+  padding: 10px 22px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #f8fafc;
+  background: #0284c7;
+  box-shadow: none;
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease,
+    opacity 0.15s ease;
+}
+
+#dom-overlay-root .run-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: #0369a1;
+}
+
+#dom-overlay-root .glass-dock.running .run-btn:hover {
+  background: #0ea5e9;
+}
+
+#dom-overlay-root .run-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+#dom-overlay-root .glass-dock.running .toggle-row label.chk input {
+  pointer-events: none;
+}
+
+#dom-overlay-root .glass-dock.running .toggle-row label.chk {
+  cursor: not-allowed;
+}

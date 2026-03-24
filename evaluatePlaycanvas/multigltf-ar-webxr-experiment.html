@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>multigltf-ar WebXR 控制变量实验 (PlayCanvas)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+  <link rel="stylesheet" href="../shared/webxr-experiment-shell.css">
+  <script src="./src/playcanvas-stable.min.js"></script>
+</head>
+<body>
+  <div id="xr-canvas-host"><canvas id="application"></canvas></div>
+  <script>
+    /* PlayCanvas AR 默认会请求 hit-test 与 light-estimation；本页额外通过 optionalFeatures / planeDetection 反映其余开关 */
+    const overlay = document.createElement('div');
+    overlay.id = 'dom-overlay-root';
+    overlay.innerHTML = `
+      <div class="stats-wrap" id="stats-mount"></div>
+      <div class="glass-dock" id="glass-dock">
+        <div class="glass-dock-inner">
+          <div class="toggle-row">
+            <span class="dock-title">PlayCanvas</span>
+            <label class="chk"><input type="checkbox" name="hitTest" checked disabled title="引擎 AR 默认启用"> Hit test</label>
+            <label class="chk"><input type="checkbox" name="anchors"> Anchors</label>
+            <label class="chk"><input type="checkbox" name="planeDetection"> Plane</label>
+            <label class="chk"><input type="checkbox" name="lightEstimation" checked disabled title="引擎 AR 默认启用"> Light est.</label>
+            <label class="chk"><input type="checkbox" name="objectTracking"> Object tr.</label>
+          </div>
+          <div class="run-btn-wrap">
+            <button type="button" class="run-btn" id="run-toggle">
+              <span class="run-btn-spinner" aria-hidden="true"></span>
+              <span class="run-btn-label">RUN</span>
+            </button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const statsMount = document.getElementById('stats-mount');
+    let stats = null;
+    import('../evaluateThree/src/myStats.js').then(function (m) {
+      stats = new m.default();
+      stats.dom.style.cssText = 'position:relative;top:8px;left:8px';
+      statsMount.appendChild(stats.dom);
+    });
+
+    function readFlags() {
+      const q = (n) => !!overlay.querySelector('[name="' + n + '"]')?.checked;
+      return {
+        hitTest: q('hitTest'),
+        anchors: q('anchors'),
+        planeDetection: q('planeDetection'),
+        lightEstimation: q('lightEstimation'),
+        objectTracking: q('objectTracking'),
+      };
+    }
+
+    function optionalExtras(f) {
+      const o = [];
+      if (f.anchors) o.push('anchors');
+      if (f.objectTracking) o.push('object-tracking');
+      return o;
+    }
+
+    let loaded = false;
+    const name = 'BoxTextured';
+    const type = 'gltf';
+    const N = 16;
+    let camera;
+    const canvas = document.getElementById('application');
+    const app = new pc.Application(canvas, {
+      touch: new pc.TouchDevice(canvas),
+      graphicsDeviceOptions: { alpha: true }
+    });
+    app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);
+    app.setCanvasResolution(pc.RESOLUTION_AUTO);
+    window.addEventListener('resize', () => app.resizeCanvas());
+
+    app.xr.domOverlay.root = overlay;
+
+    let sceneInited = false;
+    function initScene() {
+      if (sceneInited) return;
+      sceneInited = true;
+      const minx = -0.9, miny = -1.9, minz = -15;
+      const maxx = 0.9, maxy = 1.9, maxz = -3;
+      let scale;
+      const edgeNum = N;
+      let url;
+      if (name === 'BoxTextured' && type === 'gltf') {
+        url = '../gltf/BoxTextured4/BoxTextured.gltf';
+        scale = 0.1;
+      } else {
+        url = '../gltf/BoxTextured4/BoxTextured.gltf';
+        scale = 0.1;
+      }
+      app.assets.loadFromUrl(url, 'container', function (err, asset) {
+        if (err) return console.error(err);
+        const gltf = asset.resource.instantiateRenderEntity({ castShadows: true });
+        for (let i = 0; i < edgeNum; i++) {
+          for (let j = 0; j < edgeNum; j++) {
+            for (let k = 0; k < edgeNum; k++) {
+              const curx = minx + (maxx - minx) / (edgeNum - 1) * i;
+              const cury = miny + (maxy - miny) / (edgeNum - 1) * j;
+              const curz = minz + (maxz - minz) / (edgeNum - 1) * k;
+              const entity = gltf.clone();
+              entity.setPosition(curx, cury, curz);
+              entity.setLocalScale(scale, scale, scale);
+              app.root.addChild(entity);
+            }
+          }
+        }
+        loaded = true;
+        console.log('scene loaded time', performance.now());
+      });
+      camera = new pc.Entity('camera');
+      camera.addComponent('camera', { clearColor: new pc.Color(0, 0, 0, 0), farClip: 10000 });
+      app.root.addChild(camera);
+      camera.setPosition(0, 0, 3);
+      const light = new pc.Entity('light');
+      light.addComponent('light');
+      app.root.addChild(light);
+      light.setEulerAngles(45, 0, 0);
+    }
+
+    const runBtn = document.getElementById('run-toggle');
+    const glassDock = document.getElementById('glass-dock');
+    function setRunningUi(on) {
+      glassDock.classList.toggle('running', on);
+      const label = runBtn.querySelector('.run-btn-label');
+      if (label) label.textContent = on ? 'STOP' : 'RUN';
+    }
+
+    function startRun() {
+      const f = readFlags();
+      if (!app.xr.supported || !app.xr.isAvailable(pc.XRTYPE_AR)) {
+        alert('AR 不可用');
+        return;
+      }
+      initScene();
+      camera.camera.startXr(pc.XRTYPE_AR, pc.XRSPACE_LOCALFLOOR, {
+        planeDetection: f.planeDetection,
+        optionalFeatures: optionalExtras(f),
+        callback: function (err) {
+          if (err) console.log('WebXR AR failed: ' + err.message);
+        }
+      });
+      setRunningUi(true);
+    }
+
+    function stopRun() {
+      if (camera && camera.camera && app.xr.active) camera.camera.endXr();
+      setRunningUi(false);
+    }
+
+    runBtn.addEventListener('click', function () {
+      if (app.xr.active) stopRun();
+      else startRun();
+    });
+
+    app.on('update', function () {
+      if (stats) stats.update(performance.now());
+    });
+
+    app.start();
+    let startFlag = true;
+    let frameCount = 0;
+    let startTime = null;
+    let shouldLog = true;
+    let frameSum = 0;
+    let frameStart;
+    app.on('prerender', function () { frameStart = performance.now(); });
+    app.on('postrender', function () {
+      if (loaded) frameSum += performance.now() - frameStart;
+    });
+    app.on('update', function () {
+      if (!loaded) return;
+      const time = performance.now();
+      if (startFlag) {
+        startTime = time;
+        startFlag = false;
+        console.log('startTime', startTime);
+      }
+      frameCount += 1;
+      if (frameCount % 1000 === 0) {
+        const fps = 1000 * frameCount / (time - startTime);
+        const ft = frameSum / frameCount;
+        console.log(frameCount, fps, 'fps', ft, 'ft');
+      }
+      if ((time - startTime) / 1000 > 60 && shouldLog) {
+        shouldLog = false;
+        console.log('1min', (time - startTime) / 1000, frameCount);
+      }
+    });
+  </script>
+</body>
+</html>

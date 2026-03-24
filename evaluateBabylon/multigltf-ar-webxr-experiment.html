@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>multigltf-ar WebXR 控制变量实验 (Babylon.js)</title>
+  <link rel="stylesheet" href="../shared/webxr-experiment-shell.css">
+  <script src="./src/babylon.js"></script>
+  <script src="./src/babylon.glTFFileLoader.js"></script>
+</head>
+<body>
+  <div id="xr-canvas-host"><canvas id="renderCanvas"></canvas></div>
+  <script>
+    const overlay = document.createElement('div');
+    overlay.id = 'dom-overlay-root';
+    overlay.innerHTML = `
+      <div class="stats-wrap" id="stats-mount"></div>
+      <div class="glass-dock" id="glass-dock">
+        <div class="glass-dock-inner">
+          <div class="toggle-row">
+            <span class="dock-title">Babylon.js</span>
+            <label class="chk"><input type="checkbox" name="hitTest" checked> Hit test</label>
+            <label class="chk"><input type="checkbox" name="anchors"> Anchors</label>
+            <label class="chk"><input type="checkbox" name="planeDetection"> Plane</label>
+            <label class="chk"><input type="checkbox" name="lightEstimation"> Light est.</label>
+            <label class="chk"><input type="checkbox" name="objectTracking"> Mesh det.</label>
+          </div>
+          <div class="run-btn-wrap">
+            <button type="button" class="run-btn" id="run-toggle">
+              <span class="run-btn-spinner" aria-hidden="true"></span>
+              <span class="run-btn-label">RUN</span>
+            </button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    function readFlags() {
+      const q = (n) => !!overlay.querySelector('[name="' + n + '"]')?.checked;
+      return {
+        hitTest: q('hitTest'),
+        anchors: q('anchors'),
+        planeDetection: q('planeDetection'),
+        lightEstimation: q('lightEstimation'),
+        objectTracking: q('objectTracking'),
+      };
+    }
+
+    window.addEventListener('DOMContentLoaded', async function () {
+      const Stats = (await import('../evaluateThree/src/myStats.js')).default;
+      const stats = new Stats();
+      stats.dom.style.cssText = 'position:relative;top:8px;left:8px';
+      document.getElementById('stats-mount').appendChild(stats.dom);
+
+      let loaded = false;
+      const name = 'BoxTextured';
+      const type = 'gltf';
+      const N = 16;
+      const canvas = document.getElementById('renderCanvas');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const engine = new BABYLON.Engine(canvas, { antialias: true, adaptToDeviceRatio: true });
+      const scene = new BABYLON.Scene(engine);
+
+      const xr = await scene.createDefaultXRExperienceAsync({
+        uiOptions: { sessionMode: 'immersive-ar' },
+        optionalFeatures: true,
+      });
+      if (xr.enterExitUI && xr.enterExitUI._buttons && xr.enterExitUI._buttons[0]) {
+        xr.enterExitUI._buttons[0].element.style.display = 'none';
+      }
+
+      const F = BABYLON.WebXRFeatureName;
+      const fm = xr.baseExperience.featuresManager;
+
+      async function applyFeatures(f) {
+        const tryToggle = async (on, feat) => {
+          try {
+            if (on) await fm.enableFeature(feat, 'latest', function () { return true; }, true, {});
+            else fm.disableFeature(feat);
+          } catch (e) { console.warn(feat, e); }
+        };
+        await tryToggle(f.hitTest, F.HIT_TEST);
+        await tryToggle(f.anchors, F.ANCHOR_SYSTEM);
+        await tryToggle(f.planeDetection, F.PLANE_DETECTION);
+        await tryToggle(f.lightEstimation, F.LIGHT_ESTIMATION);
+        await tryToggle(f.objectTracking, F.MESH_DETECTION);
+        try {
+          await fm.enableFeature(F.DOM_OVERLAY, 'latest', function () { return { root: overlay }; }, true, {});
+        } catch (e) { /* may already be on */ }
+      }
+
+      function buildScene() {
+        scene.createDefaultCameraOrLight(true, true, true);
+        scene.activeCamera.alpha += Math.PI;
+        const minx = -1.8, miny = -4, minz = 7;
+        const maxx = 1.8, maxy = 4, maxz = 20;
+        const edgeNum = N;
+        let scale;
+        let url;
+        if (name === 'BoxTextured' && type === 'gltf') {
+          url = '../gltf/BoxTextured4/BoxTextured.gltf';
+          scale = 0.1;
+        } else {
+          url = '../gltf/BoxTextured4/BoxTextured.gltf';
+          scale = 0.1;
+        }
+        BABYLON.SceneLoader.LoadAssetContainer(url, '', scene, function (assets) {
+          for (let i = 0; i < edgeNum; i++) {
+            for (let j = 0; j < edgeNum; j++) {
+              for (let k = 0; k < edgeNum; k++) {
+                const curx = minx + (maxx - minx) / (edgeNum - 1) * i;
+                const cury = miny + (maxy - miny) / (edgeNum - 1) * j;
+                const curz = minz + (maxz - minz) / (edgeNum - 1) * k;
+                if (i === 0 && k === 0 && j === 0) {
+                  assets.meshes[0].scaling = new BABYLON.Vector3(scale, scale, -1 * scale);
+                  assets.meshes[0].position = new BABYLON.Vector3(curx, cury, curz);
+                } else {
+                  const mesh = assets.meshes[0].clone();
+                  mesh.scaling = new BABYLON.Vector3(scale, scale, -1 * scale);
+                  mesh.position = new BABYLON.Vector3(curx, cury, curz);
+                  assets.meshes.push(mesh);
+                }
+              }
+            }
+          }
+          assets.addAllToScene();
+          loaded = true;
+          console.log('scene loaded time', performance.now());
+        });
+        return scene;
+      }
+
+      buildScene();
+
+      const runBtn = document.getElementById('run-toggle');
+      const glassDock = document.getElementById('glass-dock');
+      let running = false;
+
+      function setRunningUi(on) {
+        running = on;
+        glassDock.classList.toggle('running', on);
+        const label = runBtn.querySelector('.run-btn-label');
+        if (label) label.textContent = on ? 'STOP' : 'RUN';
+      }
+
+      runBtn.addEventListener('click', async function () {
+        if (running) {
+          await xr.baseExperience.exitXRAsync();
+          setRunningUi(false);
+          return;
+        }
+        const f = readFlags();
+        await applyFeatures(f);
+        try {
+          await xr.baseExperience.enterXRAsync('immersive-ar', 'local-floor', xr.baseExperience.sessionManager.getWebXRRenderTarget());
+          setRunningUi(true);
+        } catch (e) {
+          console.error(e);
+          alert('进入 AR 失败: ' + (e && e.message));
+        }
+      });
+
+      let startFlag = true;
+      let frameCount = 0;
+      let startTime = null;
+      let shouldLog = true;
+      let frameSum = 0;
+      engine.runRenderLoop(function () {
+        const frameStart = performance.now();
+        scene.render();
+        stats.update(performance.now());
+        if (loaded) {
+          const time = performance.now();
+          if (startFlag) {
+            startTime = time;
+            startFlag = false;
+            console.log('startTime', startTime);
+          }
+          frameCount += 1;
+          frameSum += performance.now() - frameStart;
+          if (frameCount % 1000 === 0) {
+            const fps = 1000 * frameCount / (time - startTime);
+            const ft = frameSum / frameCount;
+            console.log(frameCount, fps, 'fps', ft, 'ft');
+          }
+          if ((time - startTime) / 1000 > 60 && shouldLog) {
+            shouldLog = false;
+            console.log('1min', (time - startTime) / 1000, frameCount);
+          }
+        }
+      });
+      window.addEventListener('resize', function () {
+        engine.resize();
+      });
+    });
+  </script>
+</body>
+</html>

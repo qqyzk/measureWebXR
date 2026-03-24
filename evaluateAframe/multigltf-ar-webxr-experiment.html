@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>multigltf-ar WebXR 控制变量实验 (A-Frame)</title>
+  <link rel="stylesheet" href="../shared/webxr-experiment-shell.css">
+  <style>a-scene { width: 100vw !important; height: 100vh !important; }</style>
+  <script src="./src/aframe.min.js"></script>
+  <script src="./src/jquery.min.js"></script>
+</head>
+<body>
+  <div id="dom-overlay-root">
+    <div class="stats-wrap" id="stats-mount"></div>
+    <div class="glass-dock" id="glass-dock">
+      <div class="glass-dock-inner">
+        <div class="toggle-row">
+          <span class="dock-title">A-Frame</span>
+          <label class="chk"><input type="checkbox" name="hitTest" checked> Hit test</label>
+          <label class="chk"><input type="checkbox" name="anchors"> Anchors</label>
+          <label class="chk"><input type="checkbox" name="planeDetection"> Plane</label>
+          <label class="chk"><input type="checkbox" name="lightEstimation"> Light est.</label>
+          <label class="chk"><input type="checkbox" name="objectTracking"> Object tr.</label>
+        </div>
+        <div class="run-btn-wrap">
+          <button type="button" class="run-btn" id="run-toggle">
+            <span class="run-btn-spinner" aria-hidden="true"></span>
+            <span class="run-btn-label">RUN</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const overlay = document.getElementById('dom-overlay-root');
+    let loaded = false;
+    function readFlags() {
+      const q = (n) => !!overlay.querySelector('[name="' + n + '"]')?.checked;
+      return {
+        hitTest: q('hitTest'),
+        anchors: q('anchors'),
+        planeDetection: q('planeDetection'),
+        lightEstimation: q('lightEstimation'),
+        objectTracking: q('objectTracking'),
+      };
+    }
+    function buildOptionalFeatures(f) {
+      const o = ['dom-overlay', 'local-floor'];
+      if (f.hitTest) o.push('hit-test');
+      if (f.anchors) o.push('anchors');
+      if (f.planeDetection) o.push('plane-detection');
+      if (f.lightEstimation) o.push('light-estimation');
+      if (f.objectTracking) o.push('object-tracking');
+      return o;
+    }
+
+    AFRAME.registerComponent('measure-fps', {
+      schema: {
+        startFlag: { type: 'bool', default: true },
+        frameCount: { type: 'int', default: 0 },
+        startTime: { type: 'float', default: 0 },
+        shouldLog: { type: 'bool', default: true },
+      },
+      init: function () {
+        this.data.startFlag = true;
+        this.data.frameCount = 0;
+        this.data.startTime = 0;
+        this.data.shouldLog = true;
+      },
+      tock: function () {
+        if (!loaded) return;
+        const time = performance.now();
+        if (this.data.startFlag) {
+          this.data.startTime = time;
+          this.data.startFlag = false;
+          console.log('startTime', this.data.startTime);
+        }
+        this.data.frameCount += 1;
+        if (this.data.frameCount % 1000 === 0) {
+          const fps = 1000 * this.data.frameCount / (time - this.data.startTime);
+          console.log(this.data.frameCount, fps, 'fps');
+        }
+        if ((time - this.data.startTime) / 1000 > 60 && this.data.shouldLog) {
+          this.data.shouldLog = false;
+          console.log('1min', (time - this.data.startTime) / 1000, this.data.frameCount);
+        }
+      },
+    });
+
+    AFRAME.registerComponent('multigltf', {
+      init: function () {
+        const scale = 0.1;
+        const el = this.el;
+        const sceneEl = document.querySelector('a-scene');
+        const edgeNum = 8;
+        el.addEventListener('model-loaded', function () {
+          const minx = -0.8, miny = -1.8, minz = -10;
+          const maxx = 0.8, maxy = 1.8, maxz = -3;
+          for (let i = 0; i < edgeNum; i++) {
+            for (let j = 0; j < edgeNum; j++) {
+              for (let k = 0; k < edgeNum; k++) {
+                const curx = minx + (maxx - minx) / (edgeNum - 1) * i;
+                const cury = miny + (maxy - miny) / (edgeNum - 1) * j;
+                const curz = minz + (maxz - minz) / (edgeNum - 1) * k;
+                const entity = document.createElement('a-entity');
+                entity.setAttribute('gltf-model', '#gltfID');
+                entity.setAttribute('position', curx + ' ' + cury + ' ' + curz);
+                entity.setAttribute('scale', scale + ' ' + scale + ' ' + scale);
+                sceneEl.appendChild(entity);
+              }
+            }
+          }
+          loaded = true;
+          console.log('scene loaded', performance.now());
+        });
+      },
+    });
+  </script>
+
+  <a-scene
+    id="scene"
+    embedded
+    renderer="alpha: true; antialias: true"
+    vr-mode-ui="enabled: false"
+    background="color: black"
+    measure-fps
+    webxr="referenceSpaceType: local-floor; requiredFeatures: local-floor; optionalFeatures: dom-overlay, hit-test, local-floor; overlayElement: #dom-overlay-root">
+    <a-assets>
+      <a-asset-item id="gltfID" src="../gltf/BoxTextured4/BoxTextured.gltf"></a-asset-item>
+    </a-assets>
+    <a-entity id="gltfmodel" visible="false" gltf-model="#gltfID" multigltf></a-entity>
+  </a-scene>
+
+  <script>
+    const overlay2 = document.getElementById('dom-overlay-root');
+    const runBtn = document.getElementById('run-toggle');
+    const glassDock = document.getElementById('glass-dock');
+    const scene = document.getElementById('scene');
+    function setRunningUi(on) {
+      glassDock.classList.toggle('running', on);
+      const label = runBtn.querySelector('.run-btn-label');
+      if (label) label.textContent = on ? 'STOP' : 'RUN';
+    }
+
+    runBtn.addEventListener('click', function () {
+      if (scene.is('vr-mode') || scene.is('ar-mode')) {
+        scene.exitVR();
+        setRunningUi(false);
+        return;
+      }
+      const f = readFlags();
+      scene.setAttribute('webxr', {
+        referenceSpaceType: 'local-floor',
+        requiredFeatures: ['local-floor'],
+        optionalFeatures: buildOptionalFeatures(f),
+        overlayElement: overlay2,
+      });
+      scene.enterVR(true);
+      setRunningUi(true);
+    });
+
+    scene.addEventListener('exit-vr', function () { setRunningUi(false); });
+  </script>
+  <script type="module">
+    import Stats from '../evaluateThree/src/myStats.js';
+    const statsMount = document.getElementById('stats-mount');
+    const stats = new Stats();
+    stats.dom.style.position = 'relative';
+    stats.dom.style.top = '8px';
+    stats.dom.style.left = '8px';
+    statsMount.appendChild(stats.dom);
+    function loop(t) {
+      stats.update(t != null ? t : performance.now());
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

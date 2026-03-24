@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>multigltf-ar WebXR 控制变量实验 (Three.js)</title>
+  <link rel="stylesheet" href="../shared/webxr-experiment-shell.css">
+</head>
+<body>
+  <div id="xr-canvas-host"></div>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./src/three.module.js",
+        "GLTFLoader": "./src/GLTFLoader.js",
+        "RoomEnvironment": "./src/RoomEnvironment.js",
+        "stats": "./src/myStats.js",
+        "DRACOLoader": "./src/DRACOLoader.js",
+        "wxrfeat": "../shared/webxr-experiment-features.js"
+      }
+    }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'GLTFLoader';
+    import { RoomEnvironment } from 'RoomEnvironment';
+    import Stats from 'stats';
+    import { DRACOLoader } from 'DRACOLoader';
+    import { optionalFeaturesFromFlags, readFlagsFromDom, buildDomOverlayShell } from 'wxrfeat';
+
+    const name = 'BoxTextured';
+    const type = 'gltf';
+    const N = 32;
+
+    let camera, scene, renderer;
+    let loaded = false;
+    let currentSession = null;
+    let hitTestSource = null;
+    let xrAnchor = null;
+    let refSpaceForFrame = null;
+    let flags = {};
+
+    const overlay = buildDomOverlayShell({ title: 'Three.js' });
+    document.body.appendChild(overlay);
+    const statsMount = overlay.querySelector('#stats-mount');
+    const runBtn = overlay.querySelector('#run-toggle');
+    const glassDock = overlay.querySelector('#glass-dock');
+
+    const stats = new Stats();
+    stats.dom.style.position = 'relative';
+    stats.dom.style.top = '8px';
+    stats.dom.style.left = '8px';
+    statsMount.appendChild(stats.dom);
+
+    const host = document.getElementById('xr-canvas-host');
+    renderer = new THREE.WebGLRenderer({ alpha: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true;
+    host.appendChild(renderer.domElement);
+
+    function getFlags() {
+      return readFlagsFromDom(overlay);
+    }
+
+    function setRunningUi(on) {
+      glassDock.classList.toggle('running', on);
+      const label = runBtn.querySelector('.run-btn-label');
+      if (label) label.textContent = on ? 'STOP' : 'RUN';
+    }
+
+    async function initScene() {
+      if (scene) return;
+      const pmremGenerator = new THREE.PMREMGenerator(renderer);
+      scene = new THREE.Scene();
+      scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+      camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 100);
+      const loader = new GLTFLoader();
+      const dracoLoader = new DRACOLoader();
+      dracoLoader.setDecoderPath('./decoder/');
+      loader.setDRACOLoader(dracoLoader);
+      let url;
+      if (name === 'BoxTextured' && type === 'gltf') url = '../gltf/BoxTextured4/BoxTextured.gltf';
+      else url = '../gltf/BoxTextured4/BoxTextured.gltf';
+      await new Promise((res, rej) => {
+        loader.load(url, (gltf) => {
+          const minx = -0.5, miny = -0.8, minz = -20;
+          const maxx = 0.5, maxy = 0.8, maxz = -3;
+          const edgeNum = N;
+          let scale = 0.05;
+          for (let i = 0; i < edgeNum; i++) {
+            for (let j = 0; j < edgeNum; j++) {
+              for (let k = 0; k < edgeNum; k++) {
+                const curx = minx + (maxx - minx) / (edgeNum - 1) * i;
+                const cury = miny + (maxy - miny) / (edgeNum - 1) * j;
+                const curz = minz + (maxz - minz) / (edgeNum - 1) * k;
+                const model = gltf.scene.clone();
+                model.position.set(curx, cury, curz);
+                model.scale.set(scale, scale, scale);
+                scene.add(model);
+              }
+            }
+          }
+          loaded = true;
+          console.log('model loaded', performance.now());
+          res();
+        }, undefined, rej);
+      });
+      window.addEventListener('resize', onWindowResize, false);
+    }
+
+    function onWindowResize() {
+      if (!camera) return;
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function resetXrHelpers() {
+      hitTestSource = null;
+      xrAnchor = null;
+      refSpaceForFrame = null;
+    }
+
+    renderer.xr.addEventListener('sessionstart', async () => {
+      const session = renderer.xr.getSession();
+      resetXrHelpers();
+      const refViewer = await session.requestReferenceSpace('viewer');
+      refSpaceForFrame = await session.requestReferenceSpace('local');
+      if ((flags.hitTest || flags.anchors) && session.requestHitTestSource) {
+        try {
+          hitTestSource = await session.requestHitTestSource({ space: refViewer });
+        } catch (e) { console.warn('hit-test source', e); }
+      }
+      if (flags.lightEstimation && session.requestLightProbe) {
+        try {
+          window._xrExpLightProbe = await session.requestLightProbe();
+        } catch (e) { window._xrExpLightProbe = null; }
+      }
+    });
+
+    renderer.xr.addEventListener('sessionend', () => {
+      resetXrHelpers();
+      currentSession = null;
+      setRunningUi(false);
+    });
+
+    let startFlag = true;
+    let frameCount = 0;
+    let startTime = null;
+    let shouldLog = true;
+    let frameSum = 0;
+
+    function onXRFrame() {
+      const frame = renderer.xr.getFrame();
+      const session = renderer.xr.getSession();
+      if (!frame || !session) return;
+      if (hitTestSource) {
+        try {
+          const hits = frame.getHitTestResults(hitTestSource);
+          if (flags.anchors && !xrAnchor && hits.length && refSpaceForFrame) {
+            const pose = hits[0].getPose(refSpaceForFrame);
+            if (pose && frame.createAnchor) {
+              frame.createAnchor(pose, refSpaceForFrame).then((a) => { xrAnchor = a; }).catch(() => {});
+            }
+          }
+        } catch (e) { /* noop */ }
+      }
+      if (flags.planeDetection && frame.detectedPlanes) {
+        let n = 0;
+        for (const _ of frame.detectedPlanes) { n++; if (n > 64) break; }
+      }
+      if (flags.lightEstimation) {
+        try {
+          if (typeof frame.getLightEstimate === 'function' && window._xrExpLightProbe) {
+            frame.getLightEstimate(window._xrExpLightProbe);
+          }
+        } catch (e) { /* noop */ }
+      }
+      if (xrAnchor && refSpaceForFrame) {
+        try { xrAnchor.getPose(refSpaceForFrame); } catch (e) { /* noop */ }
+      }
+    }
+
+    function render() {
+      const frameStart = performance.now();
+      onXRFrame();
+      if (scene && camera) renderer.render(scene, camera);
+      stats.update();
+      const time = performance.now();
+      if (loaded) {
+        if (startFlag) {
+          startTime = time;
+          startFlag = false;
+          console.log('startTime', startTime);
+        }
+        frameCount += 1;
+        frameSum += time - frameStart;
+        if (frameCount % 1000 === 0) {
+          const fps = 1000 * frameCount / (time - startTime);
+          const ft = frameSum / frameCount;
+          console.log(frameCount, fps, 'fps', ft, 'ft');
+        }
+        if ((time - startTime) / 1000 > 60 && shouldLog) {
+          shouldLog = false;
+          console.log('1min', (time - startTime) / 1000, frameCount);
+        }
+      }
+    }
+
+    renderer.setAnimationLoop(render);
+
+    async function startRun() {
+      flags = getFlags();
+      const optionalFeatures = optionalFeaturesFromFlags(flags, true);
+      await initScene();
+      if (!navigator.xr) {
+        alert('WebXR 不可用');
+        return;
+      }
+      try {
+        const sessionInit = {
+          optionalFeatures,
+          domOverlay: { root: overlay },
+        };
+        const session = await navigator.xr.requestSession('immersive-ar', sessionInit);
+        currentSession = session;
+        renderer.xr.setReferenceSpaceType('local');
+        await renderer.xr.setSession(session);
+        setRunningUi(true);
+      } catch (e) {
+        console.error(e);
+        alert('无法启动 AR: ' + (e && e.message));
+      }
+    }
+
+    function stopRun() {
+      if (currentSession) currentSession.end();
+    }
+
+    runBtn.addEventListener('click', () => {
+      if (currentSession) stopRun();
+      else startRun();
+    });
+  </script>
+</body>
+</html>

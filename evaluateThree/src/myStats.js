@@ -69,8 +69,9 @@ var Stats = function () {
 
 			frames ++;
 
-			// var time = ( performance || Date ).now();
-            var time = timestamp;
+			var time = ( timestamp !== undefined && timestamp !== null )
+				? timestamp
+				: ( ( typeof performance !== 'undefined' && performance.now ) ? performance.now() : Date.now() );
 
 			msPanel.update( time - beginTime, 200 );
 

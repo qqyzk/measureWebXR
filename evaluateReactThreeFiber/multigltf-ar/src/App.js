@@ -1,7 +1,7 @@
 import "./styles.css";
 import { Canvas } from "@react-three/fiber";
 import { useLoader,addAfterEffect ,addEffect} from "@react-three/fiber";
-import { Environment, OrbitControls } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { Suspense,useEffect} from "react";
@@ -63,10 +63,9 @@ const Model = () => {
     })
     
     let objs=[]
-    getPositions(N).map((item,key)=>{
-      let res = <primitive object={gltf.scene.clone()} scale={scale}  position={[item.x,item.y,item.z]}/>;
-      objs.push(res);
-    })
+    getPositions(N).forEach((item) => {
+      objs.push(<primitive object={gltf.scene.clone()} scale={scale}  position={[item.x,item.y,item.z]} key={item.x+','+item.y+','+item.z}/>);
+    });
     loaded=true;
     console.log('scene loaded',performance.now());
     return (
