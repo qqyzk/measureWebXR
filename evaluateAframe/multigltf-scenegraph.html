@@ -5,9 +5,10 @@
   </head>
   <body>
     <script>
+      const clickTimeAbsMs = performance.now() + performance.timeOrigin;
+      console.log('click time', clickTimeAbsMs);
+
       let loaded=false;
-      let frameSum = 0;
-      let frameStart,frameEnd;
       AFRAME.registerComponent('measure-fps', {
         schema: {
             startFlag: {type: 'bool', default:true},
@@ -20,34 +21,37 @@
           this.data.frameCount = 0;
           this.data.startTime = 0;
           this.data.shouldLog = true;
-          frameStart = performance.now();
+          this.frameSum = 0;
+          this.frameStart = performance.now();
+        },
+        tick: function () {
+          this.frameStart = performance.now();
         },
         tock: function () {
-          if (loaded){
-                let time = performance.now();
-                frameEnd = time;
-                if (this.data.startFlag) {
-                    this.data.startTime = time;
-                    this.data.startFlag = false;
-                    console.log('startTime',this.data.startTime);
-                }
-                this.data.frameCount += 1;
-                if(this.data.frameCount % 1000 === 0) {
-                    let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
-                    frameSum = frameEnd - frameStart;
-                    let ft = frameSum/this.data.frameCount;
-                    console.log(this.data.frameCount,fps,'fps');
-                } 
-                if ((time - this.data.startTime) /1000 > 60 && this.data.shouldLog){
-                    this.data.shouldLog = false;
-                    frameSum = frameEnd - frameStart;
-                    let ft = frameSum/this.data.frameCount;
-                    let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
-                    console.log('1min', (time - this.data.startTime)/1000, this.data.frameCount,fps,'fps');
-                }
-            } else{
-              console.log('not loaded yet');
-            }
+          if (!loaded) return;
+
+          const frameEnd = performance.now();
+          this.frameSum += frameEnd - this.frameStart;
+          const time = frameEnd;
+
+          if (this.data.startFlag) {
+              this.data.startTime = time;
+              this.data.startFlag = false;
+              console.log('startTime', this.data.startTime + performance.timeOrigin);
+          }
+
+          this.data.frameCount += 1;
+          if(this.data.frameCount % 1000 === 0) {
+              let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
+              let ft = this.frameSum/this.data.frameCount;
+              console.log(this.data.frameCount,fps,'fps',ft,'ft');
+          } 
+          if ((time - this.data.startTime) /1000 > 60 && this.data.shouldLog){
+              this.data.shouldLog = false;
+              let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
+              let ft = this.frameSum/this.data.frameCount;
+              console.log('1min', (time - this.data.startTime)/1000, this.data.frameCount,fps,'fps',ft,'ft');
+          }
         }
       });
       
@@ -55,7 +59,9 @@
       AFRAME.registerComponent('multigltf', {
           init: function(){
             console.log('init',performance.now());
-            let name=$('#gltfID')[0].attributes.src.value.split('/')[2];
+            const gltfAsset = document.getElementById('gltfID');
+            const src = gltfAsset.getAttribute('src') || '';
+            let name = src.split('/')[2];
             let scale;
             if(name==='Box'){
               scale=0.1;
@@ -65,6 +71,8 @@
               scale=5;
             }else if(name==='DamagedHelmet'){
               scale=0.1;
+            }else{
+              scale=0.1;
             }
 
               let el = this.el;
@@ -72,8 +80,10 @@
               el.addEventListener("model-loaded", e =>{    
                   let minx=-0.8, miny = -1.8, minz = -10;
                   let maxx=0.8,maxy=1.8,maxz=-3;
-                  let edgeNum=2;
-                  let LEVELS = 4;
+                  let edgeNum=16;
+                  let LEVELS = 5;
+                  const sourceModel = e.detail.model;
+                  sourceModel.updateMatrixWorld(true);
 
                   LEVELS = Math.max(1, Math.floor(LEVELS));
                   const rootForModels = (LEVELS === 1) ? sceneEl : document.createElement('a-entity');
@@ -130,7 +140,8 @@
                             let cury = miny+ (maxy-miny)/(edgeNum-1)*j;
                             let curz = minz + (maxz-minz)/(edgeNum-1)*k;
                             let entity = document.createElement('a-entity');
-                            entity.setAttribute('gltf-model', '#gltfID');
+                            // Clone already-loaded glTF scene instead of reloading the asset per node.
+                            entity.object3D.add(sourceModel.clone(true));
                             entity.setAttribute('position',String(curx)+' '+String(cury) + ' '+ String(curz));
                             entity.setAttribute('scale',String(scale)+' '+String(scale)+' '+String(scale));
                             const leafParent = getOrCreateLeafParent(i, j, k, edgeNum);
@@ -138,7 +149,9 @@
                         }
                     }
                   }
-                  console.log('scene loaded',performance.now());
+                  const sceneLoadedTimeAbsMs = performance.now() + performance.timeOrigin;
+                  console.log('scene loaded time', sceneLoadedTimeAbsMs);
+                  console.log('load duration', sceneLoadedTimeAbsMs - clickTimeAbsMs, 'ms');
                   loaded=true;
 
                 }           
@@ -147,11 +160,15 @@
       });
     </script>
     <a-scene background="color: black" measure-fps>
-      <a-asset >
-        <a-asset-item id="gltfID" src='../gltf/BoxTextured4/BoxTextured.gltf'></a-asset-item>
-      </a-asset>     
+      <a-assets>
+        <a-asset-item id="gltfID" src='../gltf/Box/Box.gltf'></a-asset-item>
+      </a-assets>
       <a-entity id="gltfmodel" visible="false" gltf-model="#gltfID"  multigltf></a-entity>
-        <a-entity camera orbit-controls="initialPosition: 0 0 -2"></a-entity> 
+
+      <a-light type="ambient" color="#ffffff" intensity="0.45"></a-light>
+      <a-light type="directional" color="#ffffff" intensity="1.8" position="2 5 4"></a-light>
+
+      <a-entity camera look-controls wasd-controls position="0 0 0"></a-entity>
     </a-scene>
     
   </body>

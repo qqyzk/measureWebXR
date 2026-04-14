@@ -1,15 +1,22 @@
 import "./styles.css";
 import { Canvas } from "@react-three/fiber";
-import { useLoader,addAfterEffect } from "@react-three/fiber";
+import { useLoader,addAfterEffect, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import * as THREE from "three";
 import { Suspense, useEffect, useMemo, useRef, useLayoutEffect, useState } from "react";
-let name = 'BoxTextured';
+let name = 'Box';
 let type = 'gltf';
-let N=32;
+const params = new URLSearchParams(window.location.search);
+const DEFAULT_N = 32;
+const parsedN = Number.parseInt(params.get('n') || String(DEFAULT_N), 10);
+let N = Number.isFinite(parsedN) && parsedN > 0 ? parsedN : DEFAULT_N;
 const publicBaseUrl = process.env.PUBLIC_URL || '';
+
+function getAbsoluteNow() {
+  return performance.timeOrigin + performance.now();
+}
 function getPositions(n){
   let minx,miny,minz,maxx,maxy,maxz;
   if(name==='Box'){
@@ -41,6 +48,9 @@ function getPositions(n){
 }
 
 let loaded=false;
+let loadLogged = false;
+let frameStartMark = 0;
+let clickTimeAbsMs = null;
 const Model = () => {
     
     let url,scale;
@@ -115,7 +125,14 @@ const Model = () => {
       }
 
       loaded=true;
-      console.log('scene loaded',performance.now());
+      if (!loadLogged) {
+        loadLogged = true;
+        const sceneLoadedTimeAbsMs = getAbsoluteNow();
+        console.log('scene loaded time', sceneLoadedTimeAbsMs);
+        if (clickTimeAbsMs !== null) {
+          console.log('load duration', sceneLoadedTimeAbsMs - clickTimeAbsMs, 'ms');
+        }
+      }
     }, [meshEntries, positions, scale]);
 
     return (
@@ -133,6 +150,13 @@ const Model = () => {
   
 };
 
+function FrameStartProbe() {
+  useFrame(() => {
+    frameStartMark = performance.now();
+  });
+  return null;
+}
+
 
 
 
@@ -140,6 +164,7 @@ let startFlag = true;
 let frameCount = 0;
 let startTime = null;
 let shouldLog = true;
+let frameSum = 0;
 export default function App() {
 
   const [started, setStarted] = useState(false);
@@ -151,20 +176,25 @@ export default function App() {
     const unsubscribe = addAfterEffect(()=>{
       if (loaded){
           let time=performance.now();
+        if (frameStartMark > 0) {
+          frameSum += Math.max(0, time - frameStartMark);
+        }
           if (startFlag) {
               startTime = time;
               startFlag = false;
-              console.log('startTime',startTime);
+          console.log('startTime', getAbsoluteNow());
           }
           frameCount += 1;
           if(frameCount % 1000 === 0) {
               let fps = 1000 * frameCount / (time - startTime);
-              console.log(frameCount,fps,'fps');
+          let ft = frameSum / frameCount;
+          console.log(frameCount,fps,'fps',ft,'ft');
           } 
           if ((time - startTime) /1000 > 60 && shouldLog){
               shouldLog = false;
               let fps = 1000 * frameCount / (time - startTime);
-              console.log('1min', (time - startTime)/1000, frameCount,fps,'fps');
+          let ft = frameSum / frameCount;
+          console.log('1min', (time - startTime)/1000, frameCount,fps,'fps',ft,'ft');
           }
       }
     })
@@ -174,7 +204,16 @@ export default function App() {
   }, [])
  
   const handleClick=()=>{
-    console.log('click',performance.now());
+    loaded = false;
+    loadLogged = false;
+    frameStartMark = 0;
+    startFlag = true;
+    frameCount = 0;
+    startTime = null;
+    shouldLog = true;
+    frameSum = 0;
+    clickTimeAbsMs = getAbsoluteNow();
+    console.log('click time', clickTimeAbsMs);
     setStarted(true);
   }
 
@@ -188,6 +227,7 @@ export default function App() {
         <Canvas>
           <color attach="background" args={['#000000']} />
           <Suspense fallback={null}>
+            <FrameStartProbe />
             <ambientLight intensity={0.1} />
             <directionalLight color="white" position={[0, 0, 5]} />
             <Model />

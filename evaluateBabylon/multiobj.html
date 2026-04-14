@@ -15,8 +15,11 @@
 		<script>
             var btn = document.getElementById("button");  
             btn.onclick = function conduct(){
-                console.log('click time',performance.now());
-                    let loaded=false;
+                const clickTimeMs = performance.now();
+                const clickTimeAbsMs = clickTimeMs + performance.timeOrigin;
+                console.log('click time', clickTimeAbsMs);
+                let loaded=false;
+                let sceneLoadedTimeAbsMs = null;
             let name='BoxTextured';
             let N=2;
             // get the canvas DOM element
@@ -76,7 +79,10 @@
                     }   
                     assets.addAllToScene();   
                     loaded=true;
-                    console.log('scene loaded time',performance.now());
+                    const loadedMs = performance.now();
+                    sceneLoadedTimeAbsMs = loadedMs + performance.timeOrigin;
+                    console.log('scene loaded time', sceneLoadedTimeAbsMs);
+                    console.log('load duration', sceneLoadedTimeAbsMs - clickTimeAbsMs, 'ms');
                            
                 });
                     
@@ -89,29 +95,34 @@
             let frameCount = 0;
             let startTime = null;
             let shouldLog = true;
+            let frameSum = 0;
             // run the render loop
             // Register and execute a render loop. The engine can have more than one render function
             engine.runRenderLoop(function(){
+                const frameStart = performance.now();
                 // Render the scene
                 scene.render();
                 // console.log('hi');
                 if (loaded){
-                    
-                    let time = performance.now();
+                    const frameEnd = performance.now();
+                    frameSum += frameEnd - frameStart;
+                    let time = frameEnd;
                     if (startFlag) {
                         startTime = time;
                         startFlag = false;
-                        console.log('startTime',startTime);
+                        console.log('startTime', startTime + performance.timeOrigin);
                     }
                     frameCount += 1;
                     if(frameCount % 1000 === 0) {
                         let fps = 1000 * frameCount / (time - startTime);
-                        console.log(frameCount,fps,'fps');
+                        let ft = frameSum/frameCount;
+                        console.log(frameCount,fps,'fps',ft,'ft');
                     } 
                     if ((time - startTime) /1000 > 60 && shouldLog){
                         shouldLog = false;
                         let fps = 1000 * frameCount / (time - startTime);
-                        console.log('1min', (time - startTime)/1000, frameCount,fps,'fps');
+                        let ft = frameSum/frameCount;
+                        console.log('1min', (time - startTime)/1000, frameCount,fps,'fps',ft,'ft');
                     }
                 }
             });

@@ -16,6 +16,7 @@
     <canvas id='application'></canvas>
     <script>
         let loaded=false;
+        let clickTimeAbsMs = null;
         let name='BoxTextured';
         let type='gltf';
         let N=16;
@@ -84,7 +85,11 @@
                 }
             }
             loaded=true;
-            console.log('scene loaded time',performance.now());
+            const sceneLoadedTimeAbsMs = performance.now() + performance.timeOrigin;
+            console.log('scene loaded time', sceneLoadedTimeAbsMs);
+            if (clickTimeAbsMs != null) {
+                console.log('load duration', sceneLoadedTimeAbsMs - clickTimeAbsMs, 'ms');
+            }
         });
         
         // create camera entity
@@ -115,7 +120,8 @@
             }
             if (app.touch) {
                 app.touch.on("touchend", function (evt) {
-                    console.log('click',performance.now());
+                    clickTimeAbsMs = performance.now() + performance.timeOrigin;
+                    console.log('click time', clickTimeAbsMs);
                     if (!app.xr.active) {
                         // if not in VR, activate
                         init();
@@ -154,7 +160,7 @@
                         if (startFlag) {
                             startTime = time;
                             startFlag = false;
-                            console.log('startTime',startTime);
+                            console.log('startTime', startTime + performance.timeOrigin);
                         }
                         frameCount += 1;
                         let frameEnd = performance.now();

@@ -25,7 +25,8 @@
 <body>
   <div id="info">
     Skeletal Animation (PlayCanvas anim component)<br>
-    <span id="status">Loading model...</span>
+    <span id="status">Loading model...</span><br>
+    <span id="metrics">Action: - | fps: - | ft: - ms</span>
   </div>
   <div id="controls">
     <button id="btn-idle" class="active">Idle</button>
@@ -37,10 +38,13 @@
   <script>
     const MODEL_URL = '../gltf/Soldier/Soldier.glb';
     let loaded = false;
-    let frameCount = 0, startTime = null, shouldLog = true;
     let soldierEntity = null;
     let animClipNames = [];
     let activeClipName = '';
+    let perfByAction = {};
+    const hudUpdateEvery = 15;
+    let frameStartStamp = null;
+    let usePostRenderMetrics = false;
 
     const canvas = document.getElementById('application');
     const app = new pc.Application(canvas);
@@ -79,12 +83,68 @@
 
     app.start();
 
+    function resetActionPerf(name) {
+      perfByAction[name] = {
+        frameCount: 0,
+        frameSum: 0,
+        startTime: null,
+        shouldLog: true
+      };
+    }
+
+    function updateMetricsHud(name, fps, ft) {
+      document.getElementById('metrics').textContent =
+        'Action: ' + name + ' | fps: ' + fps.toFixed(1) + ' | ft: ' + ft.toFixed(3) + ' ms';
+    }
+
+    function logActionSummary(name, reason) {
+      const perf = perfByAction[name];
+      if (!perf || perf.frameCount === 0 || perf.startTime === null) return;
+      const now = performance.now();
+      const elapsed = now - perf.startTime;
+      if (elapsed <= 0) return;
+      const fps = 1000 * perf.frameCount / elapsed;
+      const ft = perf.frameSum / perf.frameCount;
+      console.log('[action]', name, reason, perf.frameCount, fps, 'fps', ft, 'ft');
+    }
+
+    function recordFrameMetrics(frameStart, frameEnd) {
+      if (!loaded || !activeClipName || !perfByAction[activeClipName]) return;
+      const perf = perfByAction[activeClipName];
+      if (perf.startTime === null) perf.startTime = frameEnd;
+
+      perf.frameCount += 1;
+      perf.frameSum += (frameEnd - frameStart);
+
+      const elapsed = frameEnd - perf.startTime;
+      if (elapsed <= 0) return;
+
+      const fps = 1000 * perf.frameCount / elapsed;
+      const ft = perf.frameSum / perf.frameCount;
+
+      if (perf.frameCount % hudUpdateEvery === 0) {
+        updateMetricsHud(activeClipName, fps, ft);
+      }
+      if (perf.frameCount % 300 === 0) {
+        console.log('[action]', activeClipName, perf.frameCount, fps, 'fps', ft, 'ft');
+      }
+      if (elapsed / 1000 > 60 && perf.shouldLog) {
+        perf.shouldLog = false;
+        console.log('[1min]', activeClipName, elapsed / 1000, perf.frameCount, fps, 'fps', ft, 'ft');
+      }
+    }
+
     function switchClip(name) {
       if (!soldierEntity || !soldierEntity.anim) return;
       if (animClipNames.indexOf(name) === -1) { console.warn('No clip:', name); return; }
+      if (activeClipName && activeClipName !== name) {
+        logActionSummary(activeClipName, 'switch-out');
+      }
       try {
         soldierEntity.anim.baseLayer.transition(name, 0.3);
         activeClipName = name;
+        resetActionPerf(name);
+        updateMetricsHud(name, 0, 0);
       } catch (e) {
         console.warn('transition failed:', e);
       }
@@ -122,7 +182,11 @@
         // Play first clip
         if (animClipNames.length > 0) {
           activeClipName = animClipNames[0];
-          try { soldierEntity.anim.baseLayer.transition(activeClipName, 0); } catch (e) { console.warn(e); }
+          try {
+            soldierEntity.anim.baseLayer.transition(activeClipName, 0);
+            resetActionPerf(activeClipName);
+            updateMetricsHud(activeClipName, 0, 0);
+          } catch (e) { console.warn(e); }
         }
       } else {
         document.getElementById('status').textContent = 'No animations in model';
@@ -133,19 +197,19 @@
     });
 
     app.on('update', function () {
-      if (!loaded) return;
-      const time = performance.now();
-      if (startTime === null) startTime = time;
-      frameCount++;
-      if (frameCount % 300 === 0) {
-        const fps = 1000 * frameCount / (time - startTime);
-        console.log('frame', frameCount, fps.toFixed(1), 'fps');
+      frameStartStamp = performance.now();
+      // Fallback path if postrender is unavailable in the current runtime.
+      if (!usePostRenderMetrics && loaded) {
+        const frameEnd = performance.now();
+        recordFrameMetrics(frameStartStamp, frameEnd);
       }
-      if ((time - startTime) / 1000 > 60 && shouldLog) {
-        shouldLog = false;
-        const fps = 1000 * frameCount / (time - startTime);
-        console.log('1min result', fps.toFixed(1), 'fps');
-      }
+    });
+
+    app.on('postrender', function () {
+      if (!loaded || frameStartStamp === null) return;
+      usePostRenderMetrics = true;
+      const frameEnd = performance.now();
+      recordFrameMetrics(frameStartStamp, frameEnd);
     });
   </script>
 </body>

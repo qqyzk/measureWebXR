@@ -4,3 +4,6 @@ energy/*.xlsx
 energy/results
 example.com*
 energy/*.md
+results/
+**/node_modules/
+**/build/

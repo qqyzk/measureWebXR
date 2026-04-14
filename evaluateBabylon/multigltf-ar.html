@@ -17,6 +17,7 @@
         window.addEventListener('DOMContentLoaded', async function () {
             
             let loaded=false;
+            let clickTimeAbsMs = null;
             let name='BoxTextured';
             let type='gltf';
             let N=16;
@@ -89,7 +90,11 @@
                     }   
                     assets.addAllToScene();
                     loaded=true;
-                    console.log('scene loaded time',performance.now());
+                    const loadedTimeAbsMs = performance.now() + performance.timeOrigin;
+                    console.log('scene loaded time', loadedTimeAbsMs);
+                    if (clickTimeAbsMs != null) {
+                        console.log('load duration', loadedTimeAbsMs - clickTimeAbsMs, 'ms');
+                    }
                     
                 });
                     
@@ -102,7 +107,8 @@
            
             xr.enterExitUI._buttons[0].element.addEventListener('click',()=>{
                 // call the createScene function
-                console.log('click',performance.now());
+                clickTimeAbsMs = performance.now() + performance.timeOrigin;
+                console.log('click time', clickTimeAbsMs);
                 scene = createScene();
             })
             // 

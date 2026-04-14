@@ -26,8 +26,8 @@
     </select>
     <label for="shading-mode">shading:</label>
     <select id="shading-mode">
-      <option value="gltf-original">gltf-original</option>
       <option value="phong">phong</option>
+      <option value="gltf-original">gltf-original</option>
       <option value="pbr">pbr</option>
     </select>
   </div>
@@ -35,16 +35,19 @@
 
   <script>
     let LIGHT_MODE = 'ambient-directional';
-    let SHADING_MODE = 'gltf-original';
+    let SHADING_MODE = 'phong';
     let loaded = false;
+    let clickTimeAbsMs = null;
     let app;
     let lightEntities = [];
     let modelEntities = [];
 
     let startFlag = true, frameCount = 0, startTime = null, shouldLog = true;
+    let frameSum = 0;
+    let renderFrameStart = 0;
 
     function resetMetrics() {
-      startFlag = true; frameCount = 0; startTime = null; shouldLog = true;
+      startFlag = true; frameCount = 0; startTime = null; shouldLog = true; frameSum = 0; renderFrameStart = 0;
     }
 
     function clearLights() {
@@ -86,10 +89,12 @@
       mat.emissive = original.emissive ? original.emissive.clone() : new pc.Color(0, 0, 0);
 
       if (mode === 'phong') {
+        mat.shadingModel = pc.SPECULAR_PHONG;
         mat.useMetalness = false;
         mat.shininess = 64;
         mat.specular = new pc.Color(0.35, 0.35, 0.35);
       } else {
+        mat.shadingModel = pc.SPECULAR_BLINN;
         mat.useMetalness = true;
         mat.metalness = 0.35;
         mat.gloss = 0.55;
@@ -167,7 +172,8 @@
 
     document.getElementById('button').onclick = function () {
       document.getElementById('button').disabled = true;
-      console.log('click time', performance.now() + performance.timeOrigin);
+      clickTimeAbsMs = performance.now() + performance.timeOrigin;
+      console.log('click time', clickTimeAbsMs);
 
       const canvas = document.getElementById('application');
       app = new pc.Application(canvas);
@@ -188,7 +194,7 @@
       const scale = 0.05;
       const minx = -0.5, miny = -0.8, minz = -20;
       const maxx = 0.5, maxy = 0.8, maxz = -3;
-      const edgeNum = 2;
+      const edgeNum = 32;
       const stepDenom = Math.max(1, edgeNum - 1);
 
       app.assets.loadFromUrl(url, 'container', function (err, asset) {
@@ -212,12 +218,23 @@
         applyShading(document.getElementById('shading-mode').value);
         loaded = true;
         resetMetrics();
-        console.log('scene loaded time', performance.now() + performance.timeOrigin);
+        const sceneLoadedTimeAbsMs = performance.now() + performance.timeOrigin;
+        console.log('scene loaded time', sceneLoadedTimeAbsMs);
+        if (clickTimeAbsMs) {
+          console.log('load duration', sceneLoadedTimeAbsMs - clickTimeAbsMs, 'ms');
+        }
       });
 
-      app.on('update', function () {
+      app.on('prerender', function () {
+        if (loaded) {
+          renderFrameStart = performance.now();
+        }
+      });
+
+      app.on('postrender', function () {
         if (loaded) {
           const time = performance.now();
+          frameSum += time - renderFrameStart;
           if (startFlag) {
             startTime = time; startFlag = false;
             console.log('startTime', time + performance.timeOrigin, 'light:', LIGHT_MODE);
@@ -225,12 +242,14 @@
           frameCount += 1;
           if (frameCount % 1000 === 0) {
             const fps = 1000 * frameCount / (time - startTime);
-            console.log('light:', LIGHT_MODE, frameCount, fps.toFixed(1), 'fps');
+            const ft = frameSum / frameCount;
+            console.log('light:', LIGHT_MODE, frameCount, fps.toFixed(1), 'fps', ft, 'ft');
           }
           if ((time - startTime) / 1000 > 60 && shouldLog) {
             shouldLog = false;
             const fps = 1000 * frameCount / (time - startTime);
-            console.log('1min', 'light:', LIGHT_MODE, (time - startTime) / 1000, frameCount, fps.toFixed(1), 'fps');
+            const ft = frameSum / frameCount;
+            console.log('1min', 'light:', LIGHT_MODE, (time - startTime) / 1000, frameCount, fps.toFixed(1), 'fps', ft, 'ft');
           }
         }
       });

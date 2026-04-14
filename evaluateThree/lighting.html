@@ -61,9 +61,9 @@
 
         let name = 'Box';
         let type = 'gltf';
-        let N = 2;
+        let N =32;
         let LIGHT_MODE = 'env';
-        let SHADING_MODE = 'gltf-original';
+        let SHADING_MODE = 'phong';
 
         let camera, scene, renderer, stats;
         let loader;
@@ -78,6 +78,7 @@
         let startTime = null;
         let shouldLog = true;
         let frameSum = 0;
+        let clickTimeAbsMs = null;
 
         const btn = document.getElementById("button");
         const lightModeSelect = document.getElementById("light-mode");
@@ -108,7 +109,9 @@
 
         btn.onclick = function conduct() {
             btn.disabled = true;
-            console.log('click time', performance.now() + performance.timeOrigin);
+            const clickTimeMs = performance.now();
+            clickTimeAbsMs = clickTimeMs + performance.timeOrigin;
+            console.log('click time', clickTimeAbsMs);
             init();
             window.requestAnimationFrame(animate);
         };
@@ -200,7 +203,12 @@
 
                 loaded = true;
                 resetMetrics();
-                console.log('scene loaded time', performance.now() + performance.timeOrigin);
+                const loadedMs = performance.now();
+                const sceneLoadedTimeAbsMs = loadedMs + performance.timeOrigin;
+                console.log('scene loaded time', sceneLoadedTimeAbsMs);
+                if (clickTimeAbsMs) {
+                    console.log('load duration', sceneLoadedTimeAbsMs - clickTimeAbsMs, 'ms');
+                }
             });
 
             window.addEventListener('resize', onWindowResize, false);

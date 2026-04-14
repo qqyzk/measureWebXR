@@ -5,8 +5,14 @@ import { Environment, OrbitControls } from "@react-three/drei";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader";
 import { Suspense,useEffect} from "react";
 import ReactDOM from "react-dom";
-let name = 'BoxTextured';
+let name = 'Box';
 let N=32;
+let clickTimeAbsMs = null;
+let loadLogged = false;
+
+function getAbsoluteNow() {
+  return performance.timeOrigin + performance.now();
+}
 function getPositions(n){
   let minx,miny,minz,maxx,maxy,maxz;
 
@@ -47,14 +53,23 @@ const Model = () => {
     const fbx=useLoader(FBXLoader,url , (loader) => {
      
     })
+    useEffect(() => {
+      loaded=true;
+      if (!loadLogged) {
+        loadLogged = true;
+        const sceneLoadedTimeAbsMs = getAbsoluteNow();
+        console.log('scene loaded time',sceneLoadedTimeAbsMs);
+        if (clickTimeAbsMs !== null) {
+          console.log('load duration', sceneLoadedTimeAbsMs - clickTimeAbsMs, 'ms');
+        }
+      }
+    }, [fbx]);
   
     let objs=[]
     getPositions(N).map((item,key)=>{
       let res = <primitive object={fbx.clone()} scale={scale}  position={[item.x,item.y,item.z]}/>;
       objs.push(res);
     })
-    loaded=true;
-    console.log('scene loaded',performance.now());
     return (
       <>
       {
@@ -101,7 +116,10 @@ export default function App() {
   })
  
   const handleClick=()=>{
-    console.log('click',performance.now());
+    loaded = false;
+    loadLogged = false;
+    clickTimeAbsMs = getAbsoluteNow();
+    console.log('click time',clickTimeAbsMs);
     const rootElement = document.getElementById("root");
     ReactDOM.render( <div className="App">
     <Canvas>

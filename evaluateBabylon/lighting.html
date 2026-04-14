@@ -36,10 +36,10 @@
 
   <script>
     let LIGHT_MODE = 'ambient-directional';
-    let SHADING_MODE = 'gltf-original';
-    const MODEL_NAME = 'BoxTextured';
+    let SHADING_MODE = 'phong';
+    const MODEL_NAME = 'Box';
     const MODEL_TYPE = 'gltf';
-    const MODEL_COUNT_EDGE = 16;
+    const MODEL_COUNT_EDGE = 32;
     let loaded = false;
     let lights = [];
     let scene, engine;
@@ -47,9 +47,11 @@
     let generatedMaterials = [];
 
     let startFlag = true, frameCount = 0, startTime = null, shouldLog = true;
+    let frameSum = 0;
+    let clickTimeAbsMs = null;
 
     function resetMetrics() {
-      startFlag = true; frameCount = 0; startTime = null; shouldLog = true;
+      startFlag = true; frameCount = 0; startTime = null; shouldLog = true; frameSum = 0;
     }
 
     function clearLights() {
@@ -188,7 +190,8 @@
 
     document.getElementById('button').onclick = function () {
       document.getElementById('button').disabled = true;
-      console.log('click time', performance.now() + performance.timeOrigin);
+      clickTimeAbsMs = performance.now() + performance.timeOrigin;
+      console.log('click time', clickTimeAbsMs);
 
       const canvas = document.getElementById('renderCanvas');
       canvas.width = window.innerWidth;
@@ -256,13 +259,20 @@
         applyShading(document.getElementById('shading-mode').value);
         loaded = true;
         resetMetrics();
-        console.log('scene loaded time', performance.now() + performance.timeOrigin);
+        const sceneLoadedTimeAbsMs = performance.now() + performance.timeOrigin;
+        console.log('scene loaded time', sceneLoadedTimeAbsMs);
+        if (clickTimeAbsMs != null) {
+          console.log('load duration', sceneLoadedTimeAbsMs - clickTimeAbsMs, 'ms');
+        }
       });
 
       engine.runRenderLoop(function () {
+        const frameStart = performance.now();
         scene.render();
         if (loaded) {
-          const time = performance.now();
+          const frameEnd = performance.now();
+          frameSum += frameEnd - frameStart;
+          const time = frameEnd;
           if (startFlag) {
             startTime = time; startFlag = false;
             console.log('startTime', time + performance.timeOrigin, 'light:', LIGHT_MODE);
@@ -270,12 +280,14 @@
           frameCount += 1;
           if (frameCount % 1000 === 0) {
             const fps = 1000 * frameCount / (time - startTime);
-            console.log('light:', LIGHT_MODE, frameCount, fps.toFixed(1), 'fps');
+            const ft = frameSum / frameCount;
+            console.log('light:', LIGHT_MODE, frameCount, fps.toFixed(1), 'fps', ft, 'ft');
           }
           if ((time - startTime) / 1000 > 60 && shouldLog) {
             shouldLog = false;
             const fps = 1000 * frameCount / (time - startTime);
-            console.log('1min', 'light:', LIGHT_MODE, (time - startTime) / 1000, frameCount, fps.toFixed(1), 'fps');
+            const ft = frameSum / frameCount;
+            console.log('1min', 'light:', LIGHT_MODE, (time - startTime) / 1000, frameCount, fps.toFixed(1), 'fps', ft, 'ft');
           }
         }
       });

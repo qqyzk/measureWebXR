@@ -173,6 +173,21 @@ npm start
 平铺模式（默认）：http://localhost:3000/
 scenegraph 模式：http://localhost:3000/?mode=scenegraph&levels=4&n=32
 
+ReactThreeFiber 里修改 N 的方式：
+- multigltf：直接在 URL 里改 n，例如 http://localhost:3000/?n=16 或 http://localhost:3000/?mode=scenegraph&levels=4&n=16
+- multigltf-instanced：在对应项目目录启动后，用 http://localhost:3000/?n=16
+- 代码默认值在各自的 src/App.js 中，n 参数未传时默认 32
+
+手机通过 USB 调试时 React 页面打不开（three.js 正常）的常见原因与解决：
+- 原因：手机里的 localhost 指向手机自己，不是电脑；three.js 常走 8080 静态服务，React 开发服务是 3000，连通方式不同。
+- 方案 A（推荐，局域网）：
+	1) 在 React 项目目录运行 npm run start:lan
+	2) 手机访问 http://电脑局域网IP:3000/?n=2（不要用 localhost）
+- 方案 B（USB 直连）：
+	1) adb reverse tcp:3000 tcp:3000
+	2) 手机再访问 http://localhost:3000/?n=2
+- 若仍打不开：检查 Windows 防火墙是否放行 3000 端口。
+
 
 
 Aframe的lighting和particle完全没有显示，动画动不了，切换不了  Babylon的lighting切换不了phong,pbr，evaluatePlaycanvas的particle效果不对，应该是粒子分散飞，现在卡住了 lighting切换不了phong，pbr

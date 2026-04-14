@@ -26,7 +26,8 @@
 <body>
   <div id="info">
     Skeletal Animation (Babylon.js AnimationGroup)<br>
-    <span id="status">Loading model...</span>
+    <span id="status">Loading model...</span><br>
+    <span id="metrics">Action: - | fps: - | ft: - ms</span>
   </div>
   <div id="controls">
     <button id="btn-idle" class="active">Idle</button>
@@ -40,12 +41,71 @@
     let animationGroups = {};
     let currentGroup = null;
     let loaded = false;
-    let frameCount = 0, startTime = null, shouldLog = true;
+    let activeGroupName = '';
+    let perfByAction = {};
+    const hudUpdateEvery = 15;
+
+    function resetActionPerf(name) {
+      perfByAction[name] = {
+        frameCount: 0,
+        frameSum: 0,
+        startTime: null,
+        shouldLog: true
+      };
+    }
+
+    function updateMetricsHud(name, fps, ft) {
+      document.getElementById('metrics').textContent =
+        'Action: ' + name + ' | fps: ' + fps.toFixed(1) + ' | ft: ' + ft.toFixed(3) + ' ms';
+    }
+
+    function logActionSummary(name, reason) {
+      const perf = perfByAction[name];
+      if (!perf || perf.frameCount === 0 || perf.startTime === null) return;
+      const now = performance.now();
+      const elapsed = now - perf.startTime;
+      if (elapsed <= 0) return;
+      const fps = 1000 * perf.frameCount / elapsed;
+      const ft = perf.frameSum / perf.frameCount;
+      console.log('[action]', name, reason, perf.frameCount, fps, 'fps', ft, 'ft');
+    }
+
+    function recordFrameMetrics(actionName, frameStart, frameEnd) {
+      if (!loaded || !actionName || !perfByAction[actionName]) return;
+      const perf = perfByAction[actionName];
+      if (perf.startTime === null) perf.startTime = frameEnd;
+
+      perf.frameCount += 1;
+      perf.frameSum += (frameEnd - frameStart);
+
+      const elapsed = frameEnd - perf.startTime;
+      if (elapsed <= 0) return;
+
+      const fps = 1000 * perf.frameCount / elapsed;
+      const ft = perf.frameSum / perf.frameCount;
+
+      if (perf.frameCount % hudUpdateEvery === 0) {
+        updateMetricsHud(actionName, fps, ft);
+      }
+      if (perf.frameCount % 300 === 0) {
+        console.log('[action]', actionName, perf.frameCount, fps, 'fps', ft, 'ft');
+      }
+      if (elapsed / 1000 > 60 && perf.shouldLog) {
+        perf.shouldLog = false;
+        console.log('[1min]', actionName, elapsed / 1000, perf.frameCount, fps, 'fps', ft, 'ft');
+      }
+    }
 
     function switchAnimation(name) {
       if (!animationGroups[name]) { console.warn('No animation:', name); return; }
+      if (activeGroupName && activeGroupName !== name) {
+        logActionSummary(activeGroupName, 'switch-out');
+      }
       if (currentGroup) currentGroup.stop();
       currentGroup = animationGroups[name];
+      activeGroupName = name;
+      resetActionPerf(name);
+      updateMetricsHud(name, 0, 0);
       currentGroup.start(true, 1.0, currentGroup.from, currentGroup.to);
       document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
       document.getElementById('btn-' + name.toLowerCase()).classList.add('active');
@@ -100,6 +160,9 @@
         if (names.length > 0) {
           const first = animationGroups[names[0]];
           currentGroup = first;
+          activeGroupName = names[0];
+          resetActionPerf(activeGroupName);
+          updateMetricsHud(activeGroupName, 0, 0);
           first.start(true, 1.0, first.from, first.to);
         }
 
@@ -114,21 +177,10 @@
     );
 
     engine.runRenderLoop(function () {
+      const frameStart = performance.now();
       scene.render();
-      if (loaded) {
-        const time = performance.now();
-        if (startTime === null) startTime = time;
-        frameCount += 1;
-        if (frameCount % 300 === 0) {
-          const fps = 1000 * frameCount / (time - startTime);
-          console.log('frame', frameCount, fps.toFixed(1), 'fps');
-        }
-        if ((time - startTime) / 1000 > 60 && shouldLog) {
-          shouldLog = false;
-          const fps = 1000 * frameCount / (time - startTime);
-          console.log('1min result', fps.toFixed(1), 'fps');
-        }
-      }
+      const frameEnd = performance.now();
+      recordFrameMetrics(activeGroupName, frameStart, frameEnd);
     });
 
     window.addEventListener('resize', () => engine.resize());

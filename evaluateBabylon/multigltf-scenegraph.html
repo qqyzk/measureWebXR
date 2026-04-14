@@ -15,12 +15,15 @@
 		<script>
             var btn = document.getElementById("button");  
             btn.onclick = function conduct(){
-                console.log('click time',performance.now());
-                    let loaded=false;
-            let name='BoxTextured';
+                const clickTimeMs = performance.now();
+                const clickTimeAbsMs = clickTimeMs + performance.timeOrigin;
+                console.log('click time', clickTimeAbsMs);
+                let loaded=false;
+                let sceneLoadedTimeAbsMs = null;
+            let name='Box';
             let type='gltf';
             let N=16; 
-            let LEVELS = 4;
+            let LEVELS = 5;
             // get the canvas DOM element
             var canvas = document.getElementById('renderCanvas');
             canvas.width=window.innerWidth;
@@ -39,6 +42,7 @@
                 let edgeNum=N;
                 let scale;
                 let url;
+                let fallbackUrl = null;
                 if(name==='Box' && type==='gltf'){
                     url='../gltf/Box/Box.gltf';
                     scale=0.05;
@@ -47,6 +51,7 @@
                     scale=0.05;
                 }else if(name==='BoxTextured' && type==='gltf'){
                     url='../gltf/BoxTextured4/BoxTextured.gltf';
+                    fallbackUrl='../gltf/BoxTextured/BoxTextured.glb';
                     scale=0.05;
                 }else if(name==='BoxTextured' && type==='glb'){
                     url='../gltf/BoxTextured/BoxTextured.glb';
@@ -109,8 +114,13 @@
                     return parent;
                 }
 
-                BABYLON.SceneLoader.LoadAssetContainer(url,"",scene,
-                    (assets) => { 
+                const onAssetsLoaded = (assets) => {
+                    const templateMesh = assets.meshes.find((m) => m && typeof m.clone === 'function');
+                    if (!templateMesh) {
+                        console.error('model loaded but no clonable mesh found', assets.meshes);
+                        return;
+                    }
+
                     for(let i=0;i<edgeNum;++i){
                         for(let j=0;j<edgeNum;++j){
                             for(let k=0;k<edgeNum;++k){   
@@ -121,9 +131,9 @@
 
                                 let mesh;
                                 if(i==0 && k ==0 && j == 0){
-                                    mesh = assets.meshes[0];
+                                    mesh = templateMesh;
                                 } else{
-                                    mesh = assets.meshes[0].clone();
+                                    mesh = templateMesh.clone();
                                     assets.meshes.push(mesh);
                                 }
                                 mesh.scaling = new BABYLON.Vector3(scale,scale,-1*scale);
@@ -134,9 +144,30 @@
                     }   
                     assets.addAllToScene();
                     loaded=true;
-                    console.log('scene loaded time',performance.now());
-                    
-                });
+                    const loadedMs = performance.now();
+                    sceneLoadedTimeAbsMs = loadedMs + performance.timeOrigin;
+                    console.log('scene loaded time', sceneLoadedTimeAbsMs);
+                    console.log('load duration', sceneLoadedTimeAbsMs - clickTimeAbsMs, 'ms');
+                };
+
+                const onLoadError = (scene, message, exception) => {
+                    if (fallbackUrl && url !== fallbackUrl) {
+                        console.warn('primary model load failed, retrying with fallback', message || exception);
+                        BABYLON.SceneLoader.LoadAssetContainer(fallbackUrl, "", scene, onAssetsLoaded, null, (_s2, message2, exception2) => {
+                            console.error('fallback model load failed', message2 || exception2 || message || exception);
+                        });
+                        return;
+                    }
+
+                    console.error('model load failed', message || exception);
+                };
+
+                if (!BABYLON.SceneLoader.IsPluginForExtensionAvailable('.gltf')) {
+                    console.error('gltf loader plugin unavailable: babylon.glTFFileLoader.js may have failed to load');
+                    return scene;
+                }
+
+                BABYLON.SceneLoader.LoadAssetContainer(url, "", scene, onAssetsLoaded, null, onLoadError);
                     
         
                 return scene;
@@ -147,29 +178,34 @@
             let frameCount = 0;
             let startTime = null;
             let shouldLog = true;
+            let frameSum = 0;
             // run the render loop
             // Register and execute a render loop. The engine can have more than one render function
             engine.runRenderLoop(function(){
+                const frameStart = performance.now();
                 // Render the scene
                 scene.render();
                 // console.log('hi');
                 if (loaded){
-                    
-                    let time = performance.now();
+                    const frameEnd = performance.now();
+                    frameSum += frameEnd - frameStart;
+                    let time = frameEnd;
                     if (startFlag) {
                         startTime = time;
                         startFlag = false;
-                        console.log('startTime',startTime);
+                        console.log('startTime', startTime + performance.timeOrigin);
                     }
                     frameCount += 1;
                     if(frameCount % 1000 === 0) {
                         let fps = 1000 * frameCount / (time - startTime);
-                        console.log(frameCount,fps,'fps');
+                        let ft = frameSum/frameCount;
+                        console.log(frameCount,fps,'fps',ft,'ft');
                     } 
                     if ((time - startTime) /1000 > 60 && shouldLog){
                         shouldLog = false;
                         let fps = 1000 * frameCount / (time - startTime);
-                        console.log('1min', (time - startTime)/1000, frameCount,fps,'fps');
+                        let ft = frameSum/frameCount;
+                        console.log('1min', (time - startTime)/1000, frameCount,fps,'fps',ft,'ft');
                     }
                 }
             });

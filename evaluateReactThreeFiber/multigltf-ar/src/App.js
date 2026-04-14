@@ -7,9 +7,15 @@ import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { Suspense,useEffect} from "react";
 import {XRButton, XR} from '@react-three/xr'
 import ReactDOM from "react-dom";
-let name = 'BoxTextured';
+let name = 'Box';
 let type = 'gltf';
 let N=32;
+let clickTimeAbsMs = null;
+let loadLogged = false;
+
+function getAbsoluteNow() {
+  return performance.timeOrigin + performance.now();
+}
 function getPositions(n){
   let minx = -1.2, miny = -2, minz= -15;
   let maxx = 1.2, maxy=2, maxz=-5;
@@ -61,14 +67,23 @@ const Model = () => {
         dracoLoader.setDecoderPath('./decoder/')
         loader.setDRACOLoader(dracoLoader)
     })
+    useEffect(() => {
+      loaded=true;
+      if (!loadLogged) {
+        loadLogged = true;
+        const sceneLoadedTimeAbsMs = getAbsoluteNow();
+        console.log('scene loaded time',sceneLoadedTimeAbsMs);
+        if (clickTimeAbsMs !== null) {
+          console.log('load duration', sceneLoadedTimeAbsMs - clickTimeAbsMs, 'ms');
+        }
+      }
+    }, [gltf]);
     
     let objs=[]
     getPositions(N).map((item,key)=>{
       let res = <primitive object={gltf.scene.clone()} scale={scale}  position={[item.x,item.y,item.z]}/>;
       objs.push(res);
     })
-    loaded=true;
-    console.log('scene loaded',performance.now());
     return (
       <>
       {
@@ -120,7 +135,10 @@ export default function App() {
   })
  
   const handleClick=()=>{
-    console.log('click',performance.now());
+    loaded = false;
+    loadLogged = false;
+    clickTimeAbsMs = getAbsoluteNow();
+    console.log('click time',clickTimeAbsMs);
     const rootElement = document.getElementById("root");
     ReactDOM.render( <div className="App">
      <Canvas>

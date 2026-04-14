@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Babylon Instance Sweep Runner</title>
+</head>
+<body>
+    <script type="module">
+        import { createInstanceSweepRunner } from "../common/measureRunner.js?v=20260322-babylon-fix3";
+        createInstanceSweepRunner({
+            frameworkId: "babylon",
+            frameworkLabel: "Babylon.js",
+            normalPage: "multigltf.html",
+            instancePage: "multigltf-instance.html"
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Babylon Manual Benchmark</title>
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            color: #fff;
+            font: 13px/1.4 monospace;
+        }
+
+        #renderCanvas {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+
+        #panel {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 10001;
+            max-width: 460px;
+            background: rgba(0, 0, 0, 0.78);
+            padding: 12px;
+            border: 1px solid #333;
+        }
+
+        #controls {
+            display: grid;
+            grid-template-columns: 110px 1fr;
+            gap: 8px;
+            align-items: center;
+        }
+
+        #controls input,
+        #controls select,
+        #controls button {
+            font: inherit;
+            padding: 4px 6px;
+        }
+
+        #actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        #statusBox,
+        #resultsBox {
+            margin-top: 10px;
+            white-space: pre-wrap;
+            max-height: 220px;
+            overflow: auto;
+            border-top: 1px solid #222;
+            padding-top: 8px;
+        }
+    </style>
+    <script src="./src/babylon.js"></script>
+    <script src="./src/babylon.glTFFileLoader.js"></script>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <div id="panel">
+        <div id="controls">
+            <label for="experiment">experiment</label>
+            <select id="experiment">
+                <option value="instance">instance</option>
+                <option value="scenegraph">scenegraph</option>
+            </select>
+
+            <label for="mode">mode</label>
+            <select id="mode">
+                <option value="normal">normal</option>
+                <option value="instance">instance</option>
+            </select>
+
+            <label for="nValue">n</label>
+            <input id="nValue" type="number" min="1" step="1" value="2">
+
+            <label for="levelsValue">levels</label>
+            <input id="levelsValue" type="number" min="1" step="1" value="1">
+
+            <label for="durationValue">durationSec</label>
+            <input id="durationValue" type="number" min="1" step="1" value="60">
+
+            <label for="runnerKeyValue">runnerKey</label>
+            <input id="runnerKeyValue" type="text" value="babylon-manual-benchmark">
+
+            <label for="assetBaseUrlValue">assetBaseUrl</label>
+            <input id="assetBaseUrlValue" type="text" value="">
+        </div>
+
+        <div id="actions">
+            <button id="startButton">Start current config</button>
+            <button id="reloadButton">Reload page with params</button>
+            <button id="exportButton">Export JSON</button>
+            <button id="clearButton">Clear local results</button>
+        </div>
+
+        <pre id="statusBox"></pre>
+        <pre id="resultsBox"></pre>
+    </div>
+
+    <script type="module">
+        import {
+            clearStoredMeasurements,
+            deepestSceneGraphLevels,
+            exportStoredMeasurements,
+            getStoredMeasurements,
+            nowAbsMs,
+            publishMeasureError,
+            publishMeasureResult
+        } from "../evaluateThree/src/measureAutomation.js?v=20260322-babylon-manual";
+
+        const MODEL_NAME = "BoxTextured";
+        const MODEL_TYPE = "gltf";
+        const canvas = document.getElementById("renderCanvas");
+        const experimentEl = document.getElementById("experiment");
+        const modeEl = document.getElementById("mode");
+        const nValueEl = document.getElementById("nValue");
+        const levelsValueEl = document.getElementById("levelsValue");
+        const durationValueEl = document.getElementById("durationValue");
+        const runnerKeyValueEl = document.getElementById("runnerKeyValue");
+        const assetBaseUrlValueEl = document.getElementById("assetBaseUrlValue");
+        const startButton = document.getElementById("startButton");
+        const reloadButton = document.getElementById("reloadButton");
+        const exportButton = document.getElementById("exportButton");
+        const clearButton = document.getElementById("clearButton");
+        const statusBox = document.getElementById("statusBox");
+        const resultsBox = document.getElementById("resultsBox");
+
+        const params = new URLSearchParams(window.location.search);
+        experimentEl.value = params.get("experiment") || "instance";
+        modeEl.value = params.get("mode") || "normal";
+        nValueEl.value = params.get("n") || "2";
+        levelsValueEl.value = params.get("levels") || "1";
+        durationValueEl.value = params.get("durationSec") || "60";
+        runnerKeyValueEl.value = params.get("runnerKey") || "babylon-manual-benchmark";
+        assetBaseUrlValueEl.value = params.get("assetBaseUrl") || "";
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let engine = null;
+        let scene = null;
+        let measuring = false;
+        let loaded = false;
+        let finished = false;
+        let clickTimeAbsMs = null;
+        let sceneLoadedTimeAbsMs = null;
+        let startTime = null;
+        let startTimeAbsMs = null;
+        let frameCount = 0;
+        let frameSum = 0;
+        let shouldLog = true;
+
+        function getScale() {
+            return 0.05;
+        }
+
+        function getModelUrl(config) {
+            if (config.assetBaseUrl) {
+                return `${config.assetBaseUrl}/gltf/BoxTextured4/BoxTextured.gltf`;
+            }
+            return "../gltf/BoxTextured4/BoxTextured.gltf";
+        }
+
+        function splitModelLocation(url) {
+            const slashIndex = url.lastIndexOf("/");
+            return {
+                rootUrl: slashIndex >= 0 ? `${url.slice(0, slashIndex + 1)}` : "",
+                sceneFilename: slashIndex >= 0 ? url.slice(slashIndex + 1) : url
+            };
+        }
+
+        function readPositiveInt(element, fallback) {
+            const parsed = Number.parseInt(element.value, 10);
+            return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+        }
+
+        function getConfig() {
+            const experiment = experimentEl.value;
+            const n = readPositiveInt(nValueEl, 2);
+            const maxLevels = deepestSceneGraphLevels(n);
+            const levels = Math.min(Math.max(readPositiveInt(levelsValueEl, 1), 1), maxLevels);
+            const mode = experiment === "scenegraph" ? "scenegraph" : modeEl.value;
+            const durationSec = readPositiveInt(durationValueEl, 60);
+            const assetBaseUrl = assetBaseUrlValueEl.value.trim().replace(/\/+$/, "");
+            return {
+                framework: "babylon",
+                experiment,
+                mode,
+                n,
+                levels,
+                deepestLevels: maxLevels,
+                durationSec,
+                modelName: MODEL_NAME,
+                modelType: MODEL_TYPE,
+                saveResults: true,
+                uploadResults: false,
+                runnerKey: runnerKeyValueEl.value.trim() || "babylon-manual-benchmark",
+                assetBaseUrl
+            };
+        }
+
+        function updateControls() {
+            const config = getConfig();
+            const isScenegraph = config.experiment === "scenegraph";
+            modeEl.disabled = isScenegraph || measuring;
+            levelsValueEl.disabled = !isScenegraph || measuring;
+            experimentEl.disabled = measuring;
+            nValueEl.disabled = measuring;
+            durationValueEl.disabled = measuring;
+            runnerKeyValueEl.disabled = measuring;
+            assetBaseUrlValueEl.disabled = measuring;
+            startButton.disabled = measuring;
+        }
+
+        function renderStatus(extra) {
+            const config = getConfig();
+            statusBox.textContent = [
+                "babylon / manual benchmark",
+                `experiment=${config.experiment}`,
+                `mode=${config.mode}`,
+                `n=${config.n} objects=${config.n ** 3}`,
+                `levels=${config.levels}/${config.deepestLevels}`,
+                `duration=${config.durationSec}s`,
+                `runnerKey=${config.runnerKey}`,
+                `assetBaseUrl=${config.assetBaseUrl || "(same origin)"}`,
+                extra || (measuring ? "status=running" : "status=ready"),
+                "note=if localhost is unstable, fill your computer LAN URL here"
+            ].join("\n");
+        }
+
+        function renderResults() {
+            const config = getConfig();
+            const items = getStoredMeasurements(config.runnerKey)
+                .filter((item) => item && item.framework === "babylon")
+                .sort((a, b) => (a.reportedAtAbsMs || 0) - (b.reportedAtAbsMs || 0));
+
+            resultsBox.textContent = items.length
+                ? items.map((item) => {
+                    if (item.status && item.status !== "ok") {
+                        return `${item.experiment} mode=${item.mode} n=${item.n} levels=${item.levels ?? "-"} runId=${item.runId} status=${item.status} message=${item.message || "unknown"}`;
+                    }
+                    return `${item.experiment} mode=${item.mode} n=${item.n} levels=${item.levels ?? "-"} runId=${item.runId} loading=${item.loadingTimeMs?.toFixed?.(1) ?? item.loadingTimeMs}ms fps=${item.fps?.toFixed?.(2) ?? item.fps} ft=${item.frameTimeMs?.toFixed?.(3) ?? item.frameTimeMs}`;
+                }).join("\n")
+                : "no local Babylon results yet";
+        }
+
+        function syncUrlToControls() {
+            const config = getConfig();
+            const nextUrl = new URL(window.location.href);
+            nextUrl.searchParams.set("experiment", config.experiment);
+            nextUrl.searchParams.set("mode", config.mode);
+            nextUrl.searchParams.set("n", String(config.n));
+            nextUrl.searchParams.set("levels", String(config.levels));
+            nextUrl.searchParams.set("durationSec", String(config.durationSec));
+            nextUrl.searchParams.set("runnerKey", config.runnerKey);
+            if (config.assetBaseUrl) {
+                nextUrl.searchParams.set("assetBaseUrl", config.assetBaseUrl);
+            } else {
+                nextUrl.searchParams.delete("assetBaseUrl");
+            }
+            history.replaceState(null, "", nextUrl.toString());
+        }
+
+        function buildSceneGraph(rootForModels, currentLevel, edgeNum) {
+            const groupCache = new Map();
+            return function getOrCreateLeafParent(i, j, k) {
+                if (currentLevel === 1) {
+                    return rootForModels;
+                }
+
+                let x0 = 0;
+                let x1 = edgeNum - 1;
+                let y0 = 0;
+                let y1 = edgeNum - 1;
+                let z0 = 0;
+                let z1 = edgeNum - 1;
+                let parent = rootForModels;
+                let pathKey = "";
+
+                for (let level = 0; level < currentLevel - 1; level += 1) {
+                    const mx = (x0 + x1) >> 1;
+                    const my = (y0 + y1) >> 1;
+                    const mz = (z0 + z1) >> 1;
+                    const bx = i > mx ? 1 : 0;
+                    const by = j > my ? 1 : 0;
+                    const bz = k > mz ? 1 : 0;
+                    const oct = (bx << 2) | (by << 1) | bz;
+                    pathKey += level === 0 ? String(oct) : `/${oct}`;
+
+                    let group = groupCache.get(pathKey);
+                    if (!group) {
+                        group = new BABYLON.TransformNode(`SG_L${level + 1}_O${oct}`, scene);
+                        group.parent = parent;
+                        groupCache.set(pathKey, group);
+                    }
+                    parent = group;
+
+                    if (bx === 0) x1 = mx; else x0 = mx + 1;
+                    if (by === 0) y1 = my; else y0 = my + 1;
+                    if (bz === 0) z1 = mz; else z0 = mz + 1;
+                }
+
+                return parent;
+            };
+        }
+
+        function instantiateModelFromAssets(assets, namePrefix, allowInstances, parent) {
+            const entries = assets.instantiateModelsToScene(
+                (sourceName) => `${namePrefix}-${sourceName}`,
+                false,
+                allowInstances ? { doNotInstantiate: false } : undefined
+            );
+            const wrapper = new BABYLON.TransformNode(`${namePrefix}-root`, scene);
+            if (parent) {
+                wrapper.parent = parent;
+            }
+            for (const node of entries.rootNodes || []) {
+                if (node && node !== wrapper) {
+                    node.parent = wrapper;
+                }
+            }
+            return wrapper;
+        }
+
+        function disposeCurrentScene() {
+            if (engine) {
+                engine.stopRenderLoop();
+            }
+            if (scene) {
+                scene.dispose();
+                scene = null;
+            }
+            if (engine) {
+                engine.dispose();
+                engine = null;
+            }
+        }
+
+        function resetMetrics() {
+            loaded = false;
+            finished = false;
+            clickTimeAbsMs = null;
+            sceneLoadedTimeAbsMs = null;
+            startTime = null;
+            startTimeAbsMs = null;
+            frameCount = 0;
+            frameSum = 0;
+            shouldLog = true;
+        }
+
+        function getRepeatIndex(config) {
+            return getStoredMeasurements(config.runnerKey)
+                .filter((item) =>
+                    item &&
+                    item.framework === "babylon" &&
+                    item.experiment === config.experiment &&
+                    item.mode === config.mode &&
+                    item.n === config.n &&
+                    (config.experiment !== "scenegraph" || item.levels === config.levels)
+                ).length + 1;
+        }
+
+        function getRunId(config) {
+            const repeat = getRepeatIndex(config);
+            if (config.experiment === "scenegraph") {
+                return `babylon-scenegraph-n${config.n}-l${config.levels}-r${repeat}`;
+            }
+            return `babylon-${config.mode}-n${config.n}-r${repeat}`;
+        }
+
+        async function startMeasurement() {
+            if (measuring) return;
+
+            const config = getConfig();
+            measuring = true;
+            updateControls();
+            syncUrlToControls();
+            renderStatus("status=starting");
+            resetMetrics();
+            disposeCurrentScene();
+
+            clickTimeAbsMs = nowAbsMs();
+            console.log("click time", clickTimeAbsMs);
+
+            const minx = -0.5;
+            const miny = -1.1;
+            const minz = -10;
+            const maxx = 0.5;
+            const maxy = 1.1;
+            const maxz = -2;
+            const stepDenom = Math.max(1, config.n - 1);
+            const scale = getScale();
+
+            engine = new BABYLON.Engine(canvas, true, undefined, true);
+            scene = new BABYLON.Scene(engine);
+            scene.createDefaultCameraOrLight(true, true, true);
+            scene.activeCamera.alpha += Math.PI;
+            scene.clearColor = new BABYLON.Color3(0, 0, 0);
+
+            const modelLocation = splitModelLocation(getModelUrl(config));
+
+            try {
+                const assets = await BABYLON.SceneLoader.LoadAssetContainerAsync(
+                    modelLocation.rootUrl,
+                    modelLocation.sceneFilename,
+                    scene
+                );
+
+                const allowInstances = config.experiment === "instance" && config.mode === "instance";
+                let getOrCreateLeafParent = null;
+                if (config.experiment === "scenegraph") {
+                    const rootForModels = config.levels === 1 ? null : new BABYLON.TransformNode(`SG_root_L${config.levels}`, scene);
+                    getOrCreateLeafParent = buildSceneGraph(rootForModels, config.levels, config.n);
+                }
+
+                for (let i = 0; i < config.n; i += 1) {
+                    for (let j = 0; j < config.n; j += 1) {
+                        for (let k = 0; k < config.n; k += 1) {
+                            const curx = minx + ((maxx - minx) / stepDenom) * i;
+                            const cury = miny + ((maxy - miny) / stepDenom) * j;
+                            const curz = minz + ((maxz - minz) / stepDenom) * k;
+                            const parent = getOrCreateLeafParent ? getOrCreateLeafParent(i, j, k) : null;
+                            const modelRoot = instantiateModelFromAssets(
+                                assets,
+                                `${config.experiment}-${config.mode}-${i}-${j}-${k}`,
+                                allowInstances,
+                                parent
+                            );
+                            modelRoot.scaling = new BABYLON.Vector3(scale, scale, -scale);
+                            modelRoot.position = new BABYLON.Vector3(curx, cury, curz);
+                        }
+                    }
+                }
+
+                loaded = true;
+                sceneLoadedTimeAbsMs = nowAbsMs();
+                renderStatus("status=running");
+                console.log("scene loaded time", sceneLoadedTimeAbsMs);
+            } catch (exception) {
+                await publishMeasureError({
+                    framework: config.framework,
+                    experiment: config.experiment,
+                    mode: config.mode,
+                    n: config.n,
+                    levels: config.experiment === "scenegraph" ? config.levels : null,
+                    totalObjects: config.n ** 3,
+                    modelName: config.modelName,
+                    modelType: config.modelType,
+                    clickTimeAbsMs,
+                    message: exception?.message || "Babylon load failed",
+                    runId: getRunId(config)
+                }, null, config);
+                measuring = false;
+                updateControls();
+                renderStatus("status=error");
+                renderResults();
+                return;
+            }
+
+            engine.runRenderLoop(async () => {
+                if (!scene) return;
+                const frameStart = performance.now();
+                scene.render();
+                if (!loaded || finished) return;
+
+                const time = performance.now();
+                frameSum += time - frameStart;
+                if (startTime === null) {
+                    startTime = time;
+                    startTimeAbsMs = nowAbsMs();
+                    console.log("startTime", startTimeAbsMs);
+                }
+                frameCount += 1;
+
+                if (frameCount % 1000 === 0) {
+                    const fps = 1000 * frameCount / (time - startTime);
+                    const ft = frameSum / frameCount;
+                    console.log(frameCount, fps, "fps", ft, "ft");
+                }
+
+                if ((time - startTime) / 1000 > config.durationSec && shouldLog) {
+                    shouldLog = false;
+                    finished = true;
+                    const fps = 1000 * frameCount / (time - startTime);
+                    const ft = frameSum / frameCount;
+                    console.log("done", (time - startTime) / 1000, frameCount, fps, "fps", ft, "ft");
+                    await publishMeasureResult({
+                        status: "ok",
+                        framework: config.framework,
+                        experiment: config.experiment,
+                        mode: config.mode,
+                        n: config.n,
+                        totalObjects: config.n ** 3,
+                        levels: config.experiment === "scenegraph" ? config.levels : null,
+                        durationSec: config.durationSec,
+                        modelName: config.modelName,
+                        modelType: config.modelType,
+                        clickTimeAbsMs,
+                        sceneLoadedTimeAbsMs,
+                        loadingTimeMs: sceneLoadedTimeAbsMs == null ? null : sceneLoadedTimeAbsMs - clickTimeAbsMs,
+                        startTimeAbsMs,
+                        frameCount,
+                        fps,
+                        frameTimeMs: ft,
+                        runId: getRunId(config)
+                    }, null, config);
+                    engine.stopRenderLoop();
+                    measuring = false;
+                    updateControls();
+                    renderStatus("status=done");
+                    renderResults();
+                }
+            });
+        }
+
+        function reloadWithCurrentParams() {
+            syncUrlToControls();
+            window.location.reload();
+        }
+
+        experimentEl.addEventListener("change", () => {
+            updateControls();
+            renderStatus();
+        });
+        modeEl.addEventListener("change", renderStatus);
+        nValueEl.addEventListener("change", renderStatus);
+        levelsValueEl.addEventListener("change", renderStatus);
+        durationValueEl.addEventListener("change", renderStatus);
+        runnerKeyValueEl.addEventListener("change", () => {
+            renderStatus();
+            renderResults();
+        });
+        assetBaseUrlValueEl.addEventListener("change", renderStatus);
+
+        startButton.onclick = () => startMeasurement();
+        reloadButton.onclick = () => reloadWithCurrentParams();
+        exportButton.onclick = () => {
+            const config = getConfig();
+            const exported = exportStoredMeasurements(config.runnerKey, "babylon-manual");
+            alert(`Exported ${exported.count} items to ${exported.fileName}`);
+        };
+        clearButton.onclick = () => {
+            const config = getConfig();
+            clearStoredMeasurements(config.runnerKey);
+            renderStatus();
+            renderResults();
+        };
+
+        window.addEventListener("resize", () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            if (engine) {
+                engine.resize();
+            }
+        });
+
+        updateControls();
+        renderStatus();
+        renderResults();
+    </script>
+</body>
+</html>

@@ -11,6 +11,12 @@ const publicBaseUrl = process.env.PUBLIC_URL || '';
 let name = 'Box';
 let type = 'gltf';
 let N = 2;
+let clickTimeAbsMs = null;
+let loadLogged = false;
+
+function getAbsoluteNow() {
+  return performance.timeOrigin + performance.now();
+}
 
 function getPositions() {
   const minx = -0.5, miny = -0.8, minz = -20;
@@ -34,6 +40,10 @@ function Model() {
   let url, scale;
   if (name === 'Box' && type === 'gltf') {
     url = `${publicBaseUrl}/gltf/Box/box.gltf`; scale = 0.05;
+  } else if (name === 'Box' && type === 'glb') {
+    url = `${publicBaseUrl}/gltf/Box/Box.glb`; scale = 0.05;
+  } else if (name === 'BoxTextured' && type === 'gltf') {
+    url = `${publicBaseUrl}/gltf/BoxTextured4/BoxTextured.gltf`; scale = 0.05;
   } else {
     url = `${publicBaseUrl}/gltf/Box/Box.glb`; scale = 0.05;
   }
@@ -46,7 +56,14 @@ function Model() {
 
   useEffect(() => {
     loaded = true;
-    console.log('scene loaded', performance.now());
+    if (!loadLogged) {
+      loadLogged = true;
+      const sceneLoadedTimeAbsMs = getAbsoluteNow();
+      console.log('scene loaded time', sceneLoadedTimeAbsMs);
+      if (clickTimeAbsMs !== null) {
+        console.log('load duration', sceneLoadedTimeAbsMs - clickTimeAbsMs, 'ms');
+      }
+    }
   }, [gltf]);
 
   const positions = useMemo(() => getPositions(), []);
@@ -146,7 +163,13 @@ export default function AppLighting() {
         padding: 10, borderRadius: 6, fontFamily: 'monospace'
       }}>
         {!started && (
-          <button onClick={() => { console.log('click', performance.now()); setStarted(true); }}>
+          <button onClick={() => {
+            loaded = false;
+            loadLogged = false;
+            clickTimeAbsMs = getAbsoluteNow();
+            console.log('click time', clickTimeAbsMs);
+            setStarted(true);
+          }}>
             Start
           </button>
         )}

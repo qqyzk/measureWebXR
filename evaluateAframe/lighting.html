@@ -32,7 +32,8 @@
   <script>
     let loaded = false;
     let currentLightMode = 'ambient-directional';
-    let currentShadingMode = 'gltf-original';
+    let currentShadingMode = 'phong';
+    let clickTimeAbsMs = null;
     const convertedMaterialCache = new Map();
 
     AFRAME.registerComponent('measure-fps', {
@@ -75,7 +76,7 @@
         this.el.addEventListener('model-loaded', () => {
           const minx = -0.5, miny = -0.8, minz = -20;
           const maxx = 0.5, maxy = 0.8, maxz = -3;
-          const edgeNum = 2;
+          const edgeNum = 32;
           const stepDenom = Math.max(1, edgeNum - 1);
           for (let i = 0; i < edgeNum; ++i) {
             for (let j = 0; j < edgeNum; ++j) {
@@ -99,7 +100,11 @@
             }
           }
           loaded = true;
-          console.log('scene loaded time', performance.now() + performance.timeOrigin);
+          const sceneLoadedTimeAbsMs = performance.now() + performance.timeOrigin;
+          console.log('scene loaded time', sceneLoadedTimeAbsMs);
+          if (clickTimeAbsMs) {
+            console.log('load duration', sceneLoadedTimeAbsMs - clickTimeAbsMs, 'ms');
+          }
         });
       }
     });
@@ -232,8 +237,12 @@
 
     document.getElementById('button').addEventListener('click', () => {
       document.getElementById('button').disabled = true;
-      console.log('click time', performance.now() + performance.timeOrigin);
+      clickTimeAbsMs = performance.now() + performance.timeOrigin;
+      console.log('click time', clickTimeAbsMs);
       applyLighting(document.getElementById('light-mode').value);
+      const modelEntity = document.getElementById('gltfmodel');
+      modelEntity.setAttribute('gltf-model', '#gltfID');
+      loaded = false;
     });
 
     document.querySelector('a-scene').addEventListener('loaded', () => {
@@ -246,7 +255,7 @@
     <a-assets>
       <a-asset-item id="gltfID" src="../gltf/Box/box.gltf"></a-asset-item>
     </a-assets>
-    <a-entity id="gltfmodel" visible="false" gltf-model="#gltfID" multigltf-lighting></a-entity>
+    <a-entity id="gltfmodel" visible="false" multigltf-lighting></a-entity>
     <a-entity camera position="0 0 0"></a-entity>
   </a-scene>
 </body>

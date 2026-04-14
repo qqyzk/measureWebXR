@@ -29,7 +29,8 @@
         Skeletal Animation (Three.js AnimationMixer)<br>
         Reference: <a href="https://threejs.org/examples/#webgl_animation_skinning_morph" style="color:#8cf" target="_blank">
             threejs.org/examples – skinning/morph</a><br>
-        <span id="status">Load a model with animations via GLTFLoader</span>
+        <span id="status">Load a model with animations via GLTFLoader</span><br>
+        <span id="metrics">Action: - | fps: - | ft: - ms</span>
     </div>
     <div id="controls">
         <button id="btn-idle"  class="active">Idle</button>
@@ -44,7 +45,9 @@
         let camera, scene, renderer, mixer, clock;
         let actions = {}, activeAction, previousAction;
         let skeleton;
-        let frameCount = 0, startTime = null, shouldLog = true;
+        let activeActionName = null;
+        let perfByAction = {};
+        let hudUpdateEvery = 15;
 
         // ── Model path ───────────────────────────────────────────
         // Three.js official skeletal animation example model:
@@ -129,8 +132,7 @@
                     // Start with first available clip
                     const firstKey = Object.keys(actions)[0];
                     if (firstKey) {
-                        activeAction = actions[firstKey];
-                        activeAction.play();
+                        switchAction(firstKey);
                     }
                 },
                 (xhr) => {
@@ -165,15 +167,46 @@
         // Cross-fade between animation clips
         function switchAction(name) {
             if (!actions[name]) { console.warn('No clip:', name); return; }
+            if (activeActionName && activeActionName !== name) {
+                logActionSummary(activeActionName, 'switch-out');
+            }
             previousAction = activeAction;
             activeAction = actions[name];
             if (previousAction && previousAction !== activeAction) {
                 previousAction.fadeOut(0.3);
             }
             activeAction.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).fadeIn(0.3).play();
+            activeActionName = name;
+            resetActionPerf(name);
+            updateMetricsHud(name, 0, 0);
 
             document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
             document.getElementById('btn-' + name.toLowerCase()).classList.add('active');
+        }
+
+        function resetActionPerf(name) {
+            perfByAction[name] = {
+                frameCount: 0,
+                frameSum: 0,
+                startTime: null,
+                shouldLog: true
+            };
+        }
+
+        function updateMetricsHud(name, fps, ft) {
+            document.getElementById('metrics').textContent =
+                'Action: ' + name + ' | fps: ' + fps.toFixed(1) + ' | ft: ' + ft.toFixed(3) + ' ms';
+        }
+
+        function logActionSummary(name, reason) {
+            const perf = perfByAction[name];
+            if (!perf || perf.frameCount === 0 || perf.startTime === null) return;
+            const now = performance.now();
+            const elapsed = now - perf.startTime;
+            if (elapsed <= 0) return;
+            const fps = 1000 * perf.frameCount / elapsed;
+            const ft = perf.frameSum / perf.frameCount;
+            console.log('[action]', name, reason, perf.frameCount, fps, 'fps', ft, 'ft');
         }
 
         // ── Fallback: procedural skinned cube (no GLTF needed) ───
@@ -202,9 +235,9 @@
             const boneTip  = new THREE.Bone(); boneTip.position.set(0, 1, 0);
             boneRoot.add(boneTip);
 
-            const skeleton = new THREE.Skeleton([boneRoot, boneTip]);
+            const boneSkeleton = new THREE.Skeleton([boneRoot, boneTip]);
             mesh.add(boneRoot);
-            mesh.bind(skeleton);
+            mesh.bind(boneSkeleton);
             mesh.position.set(0, 0, 0);
             scene.add(mesh);
 
@@ -225,25 +258,46 @@
             const clip = new THREE.AnimationClip('wave', 1, [kf]);
             mixer = new THREE.AnimationMixer(mesh);
             mixer.clipAction(clip).play();
+            activeActionName = 'Wave';
+            resetActionPerf(activeActionName);
+            updateMetricsHud(activeActionName, 0, 0);
+
+            skeleton = helper;
         }
 
         function animate() {
+            const frameStart = performance.now();
             requestAnimationFrame(animate);
             const delta = clock.getDelta();
             if (mixer) mixer.update(delta);
             renderer.render(scene, camera);
 
-            const now = performance.now();
-            if (startTime === null) startTime = now;
-            frameCount++;
-            if (frameCount % 300 === 0) {
-                const fps = 1000 * frameCount / (now - startTime);
-                console.log(`frame ${frameCount}  fps: ${fps.toFixed(1)}`);
-            }
-            if ((now - startTime) / 1000 > 60 && shouldLog) {
-                shouldLog = false;
-                const fps = 1000 * frameCount / (now - startTime);
-                console.log('1min result', fps.toFixed(1), 'fps');
+            const frameEnd = performance.now();
+            if (activeActionName && perfByAction[activeActionName]) {
+                const perf = perfByAction[activeActionName];
+                if (perf.startTime === null) perf.startTime = frameEnd;
+
+                perf.frameCount += 1;
+                perf.frameSum += (frameEnd - frameStart);
+
+                const elapsed = frameEnd - perf.startTime;
+                if (elapsed > 0) {
+                    const fps = 1000 * perf.frameCount / elapsed;
+                    const ft = perf.frameSum / perf.frameCount;
+
+                    if (perf.frameCount % hudUpdateEvery === 0) {
+                        updateMetricsHud(activeActionName, fps, ft);
+                    }
+
+                    if (perf.frameCount % 300 === 0) {
+                        console.log('[action]', activeActionName, perf.frameCount, fps, 'fps', ft, 'ft');
+                    }
+
+                    if (elapsed / 1000 > 60 && perf.shouldLog) {
+                        perf.shouldLog = false;
+                        console.log('[1min]', activeActionName, elapsed / 1000, perf.frameCount, fps, 'fps', ft, 'ft');
+                    }
+                }
             }
         }
     </script>

@@ -5,6 +5,9 @@
   </head>
   <body>
     <script>
+      const clickTimeAbsMs = performance.now() + performance.timeOrigin;
+      console.log('click time', clickTimeAbsMs);
+
       let loaded=false;
       AFRAME.registerComponent('measure-fps', {
         schema: {
@@ -18,28 +21,37 @@
           this.data.frameCount = 0;
           this.data.startTime = 0;
           this.data.shouldLog = true;
+          this.frameSum = 0;
+          this.frameStart = performance.now();
+        },
+        tick: function () {
+          this.frameStart = performance.now();
         },
         tock: function () {
-          if (loaded){
-                let time = performance.now();
-                if (this.data.startFlag) {
-                    this.data.startTime = time;
-                    this.data.startFlag = false;
-                    console.log('startTime',this.data.startTime);
-                }
-                this.data.frameCount += 1;
-                if(this.data.frameCount % 1000 === 0) {
-                    let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
-                    console.log(this.data.frameCount,fps,'fps');
-                } 
-                if ((time - this.data.startTime) /1000 > 60 && this.data.shouldLog){
-                    this.data.shouldLog = false;
-                    let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
-                    console.log('1min', (time - this.data.startTime)/1000, this.data.frameCount,fps,'fps');
-                }
-            } else{
-              console.log('not loaded yet');
-            }
+          if (!loaded) return;
+
+          const frameEnd = performance.now();
+          this.frameSum += frameEnd - this.frameStart;
+          const time = frameEnd;
+
+          if (this.data.startFlag) {
+              this.data.startTime = time;
+              this.data.startFlag = false;
+              console.log('startTime', this.data.startTime + performance.timeOrigin);
+          }
+
+          this.data.frameCount += 1;
+          if(this.data.frameCount % 1000 === 0) {
+              let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
+              let ft = this.frameSum/this.data.frameCount;
+              console.log(this.data.frameCount,fps,'fps',ft,'ft');
+          } 
+          if ((time - this.data.startTime) /1000 > 60 && this.data.shouldLog){
+              this.data.shouldLog = false;
+              let fps = 1000 * this.data.frameCount / (time - this.data.startTime);
+              let ft = this.frameSum/this.data.frameCount;
+              console.log('1min', (time - this.data.startTime)/1000, this.data.frameCount,fps,'fps',ft,'ft');
+          }
         }
       });
       
@@ -81,7 +93,9 @@
                         }
                     }
                   }
-                  console.log('scene loaded',performance.now());
+                  const sceneLoadedTimeAbsMs = performance.now() + performance.timeOrigin;
+                  console.log('scene loaded time', sceneLoadedTimeAbsMs);
+                  console.log('load duration', sceneLoadedTimeAbsMs - clickTimeAbsMs, 'ms');
                   loaded=true;
                 }    
                      
