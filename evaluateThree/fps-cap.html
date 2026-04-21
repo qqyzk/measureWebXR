@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<title>FPS Cap Test - Three.js</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+</head>
+
+<body>
+    <input  id="button" type="button" value="start" >
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./node_modules/three/build/three.module.js",
+                "GLTFLoader":"./node_modules/three/examples/jsm/loaders/GLTFLoader.js",
+                "RoomEnvironment": "./node_modules/three/examples/jsm/environments/RoomEnvironment.js",
+                "stats": "./src/myStats.js",
+                "DRACOLoader": "./node_modules/three/examples/jsm/loaders/DRACOLoader.js"
+            }
+        }
+    </script>
+	<script type="module">
+        window.events = [];
+
+        import * as THREE from './src/three.module.js';
+        import {GLTFLoader} from "./src/GLTFLoader2.js";
+        import {RoomEnvironment} from "./src/RoomEnvironment2.js";
+        import Stats from "./src/myStats.js";
+
+        const params = new URLSearchParams(window.location.search);
+        const fpsCap = Number(params.get('fpsCap') || '60');
+        const targetInterval = 1000 / fpsCap;
+        const N = 16; // 16^3 = 4096 models
+
+        let camera, scene, renderer, stats;
+        var btn = document.getElementById("button");
+        btn.onclick = function conduct(){
+            let loaded = false;
+        console.log('click time', performance.now() + performance.timeOrigin);
+        console.log('FPS cap:', fpsCap, 'interval:', targetInterval.toFixed(1), 'ms');
+		init();
+
+		function init() {
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+            stats = new Stats();
+            stats.dom.style.top = '20px';
+            stats.dom.style.left = '300px';
+            container.appendChild(stats.dom);
+            renderer = new THREE.WebGLRenderer({alpha: true });
+			renderer.setPixelRatio(window.devicePixelRatio);
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			container.appendChild(renderer.domElement);
+
+            const pmremGenerator = new THREE.PMREMGenerator( renderer );
+			scene = new THREE.Scene();
+            scene.environment = pmremGenerator.fromScene( new RoomEnvironment(), 0.04 ).texture;
+            scene.background = new THREE.Color( 0x000000 );
+			camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 100);
+
+            let loader = new GLTFLoader();
+            let url = '../gltf/Box/box.gltf';
+            loader.load( url, function ( gltf ) {
+                let minx = -0.5, miny = -0.8, minz= -20;
+                let maxx = 0.5, maxy=0.8, maxz=-3;
+                let edgeNum = N;
+                let scale = 0.05;
+                for(let i=0;i<edgeNum;++i){
+                    for(let j=0;j<edgeNum;++j){
+                        for(let k=0;k<edgeNum;++k){
+                            let curx = minx + (maxx-minx)/(edgeNum-1)*i;
+                            let cury = miny + (maxy-miny)/(edgeNum-1)*j;
+                            let curz = minz + (maxz-minz)/(edgeNum-1)*k;
+                            let model = gltf.scene.clone();
+                            model.position.set(curx, cury, curz);
+                            model.scale.set(scale, scale, scale);
+                            scene.add(model);
+                        }
+                    }
+                }
+                loaded = true;
+            })
+
+			window.addEventListener('resize', onWindowResize, false);
+		}
+
+		function onWindowResize() {
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+			renderer.setSize(window.innerWidth, window.innerHeight);
+		}
+
+        let startFlag = true;
+        let frameCount = 0;
+        let startTime = null;
+        let shouldLog = true;
+        let frameSum = 0;
+        let lastRenderTime = 0;
+
+		function animate(t) {
+			requestAnimationFrame(animate);
+            let now = performance.now();
+
+            // FPS cap: skip render if not enough time has passed
+            if (now - lastRenderTime < targetInterval) return;
+            lastRenderTime = now;
+
+            let frameStart = performance.now();
+            stats.update(now);
+			renderer.render(scene, camera);
+
+            if (loaded) {
+                let frameEnd = performance.now();
+                frameSum += frameEnd - frameStart;
+                if (startFlag) {
+                    startTime = now;
+                    startFlag = false;
+                    console.log('startTime', performance.now() + performance.timeOrigin);
+                }
+                frameCount += 1;
+                if(frameCount % 1000 === 0) {
+                    let fps = 1000 * frameCount / (now - startTime);
+                    let ft = frameSum / frameCount;
+                    console.log(frameCount, fps, 'fps', ft, 'ft');
+                }
+                if ((now - startTime) / 1000 > 60 && shouldLog) {
+                    shouldLog = false;
+                    let fps = 1000 * frameCount / (now - startTime);
+                    let ft = frameSum / frameCount;
+                    console.log('1min', (now - startTime)/1000, frameCount, fps, 'fps', ft, 'ft');
+                }
+            }
+		}
+        window.requestAnimationFrame(animate);
+    }
+
+	</script>
+</body>
+
+</html>

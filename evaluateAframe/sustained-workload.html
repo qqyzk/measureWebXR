@@ -1,0 +1,110 @@
+<html>
+  <head>
+    <title>Sustained Workload Test - A-Frame</title>
+    <script src="./src/aframe.min.js"></script>
+    <script src="./src/jquery.min.js"></script>
+  </head>
+  <body>
+    <script>
+      let loaded = false;
+      let DURATION = 600;
+      let WINDOW = 10;
+
+      let startFlag = true;
+      let startTime = null;
+      let windowFrameSum = 0;
+      let windowFrameCount = 0;
+      let windowStartTime = null;
+      let lastTickTime = null;
+      let results = [];
+      let finished = false;
+
+      AFRAME.registerComponent('measure-fps', {
+        init: function () {
+          lastTickTime = performance.now();
+        },
+        tock: function () {
+          if (!loaded || finished) return;
+
+          let now = performance.now();
+          let frametime = now - lastTickTime;
+          lastTickTime = now;
+
+          if (startFlag) {
+            startTime = now;
+            windowStartTime = now;
+            startFlag = false;
+            console.log('startTime', startTime);
+            return;
+          }
+
+          windowFrameSum += frametime;
+          windowFrameCount += 1;
+
+          let elapsed = (now - startTime) / 1000;
+          let windowElapsed = (now - windowStartTime) / 1000;
+
+          if (windowElapsed >= WINDOW) {
+            let avgFt = windowFrameSum / windowFrameCount;
+            let windowFps = 1000 * windowFrameCount / (now - windowStartTime);
+            let entry = {t: Math.round(elapsed), ft: parseFloat(avgFt.toFixed(2)), fps: parseFloat(windowFps.toFixed(1)), frames: windowFrameCount};
+            results.push(entry);
+            console.log('window', entry.t + 's', 'ft=' + entry.ft + 'ms', 'fps=' + entry.fps, 'frames=' + entry.frames);
+
+            windowFrameSum = 0;
+            windowFrameCount = 0;
+            windowStartTime = now;
+          }
+
+          if (elapsed >= DURATION) {
+            finished = true;
+            console.log('=== RESULTS ===');
+            console.log(JSON.stringify(results));
+            console.log('=== END ===');
+          }
+        }
+      });
+
+      AFRAME.registerComponent('multigltf', {
+          init: function(){
+            console.log('init',performance.now());
+            let name = 'Box';
+            let scale = 0.1;
+
+            let el = this.el;
+            let sceneEl = document.querySelector('a-scene');
+            el.addEventListener("model-loaded", e =>{
+                let minx=-0.8, miny = -1.8, minz = -10;
+                let maxx=0.8, maxy=1.8, maxz=-3;
+                let edgeNum = 16;
+                for(let i=0;i<edgeNum;++i){
+                  for(let j=0;j<edgeNum;++j){
+                      for(let k=0;k<edgeNum;++k){
+                          let curx = minx + (maxx-minx)/(edgeNum-1)*i;
+                          let cury = miny+ (maxy-miny)/(edgeNum-1)*j;
+                          let curz = minz + (maxz-minz)/(edgeNum-1)*k;
+                          let entity = document.createElement('a-entity');
+                          entity.setAttribute('gltf-model', '#gltfID');
+                          entity.setAttribute('position',String(curx)+' '+String(cury) + ' '+ String(curz));
+                          entity.setAttribute('scale',String(scale)+' '+String(scale)+' '+String(scale));
+                          sceneEl.appendChild(entity);
+                      }
+                  }
+                }
+                console.log('scene loaded',performance.now());
+                loaded = true;
+              }
+            );
+          }
+      });
+    </script>
+    <a-scene background="color: black" measure-fps>
+      <a-asset >
+        <a-asset-item id="gltfID" src='../gltf/Box/box.gltf'></a-asset-item>
+      </a-asset>
+      <a-entity id="gltfmodel" visible="false" gltf-model="#gltfID"  multigltf></a-entity>
+        <a-entity camera orbit-controls="initialPosition: 0 0 -2"></a-entity>
+    </a-scene>
+
+  </body>
+</html>

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<title>Sustained Workload Test - Three.js</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+</head>
+
+<body>
+    <input  id="button" type="button" value="start" >
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./node_modules/three/build/three.module.js",
+                "GLTFLoader":"./node_modules/three/examples/jsm/loaders/GLTFLoader.js",
+                "RoomEnvironment": "./node_modules/three/examples/jsm/environments/RoomEnvironment.js",
+                "stats": "./src/myStats.js",
+                "DRACOLoader": "./node_modules/three/examples/jsm/loaders/DRACOLoader.js"
+
+            }
+        }
+    </script>
+	<script type="module">
+        window.events = [];
+
+        import * as THREE from './src/three.module.js';
+        import {GLTFLoader} from "./src/GLTFLoader2.js";
+        import {RoomEnvironment} from "./src/RoomEnvironment2.js";
+        import Stats from "./src/myStats.js";
+
+        let name = 'Box';
+        let type = 'gltf';
+        let N = 16; // 16^3 = 4096 objects
+        let DURATION = 600; // 10 minutes
+        let WINDOW = 10; // 10 seconds per window
+
+        let camera, scene, renderer, stats;
+        let loader;
+        var btn = document.getElementById("button");
+        btn.onclick = function conduct(){
+            let loaded = false;
+        console.log('click time', performance.now() + performance.timeOrigin);
+		init();
+
+		function init() {
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+            stats = new Stats();
+            stats.dom.style.top = '20px';
+            stats.dom.style.left = '300px';
+            container.appendChild(stats.dom);
+            renderer = new THREE.WebGLRenderer({alpha: true });
+			renderer.setPixelRatio(window.devicePixelRatio);
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			container.appendChild(renderer.domElement);
+
+            const pmremGenerator = new THREE.PMREMGenerator( renderer );
+			scene = new THREE.Scene();
+            scene.environment = pmremGenerator.fromScene( new RoomEnvironment(), 0.04 ).texture;
+            scene.background = new THREE.Color( 0x000000 );
+			camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 100);
+
+            loader = new GLTFLoader();
+            let url;
+            if(name==='Box' && type==='gltf'){
+                url='../gltf/Box/box.gltf';
+            }else if(name==='BoxTextured' && type==='gltf'){
+                url='../gltf/BoxTextured4/BoxTextured.gltf';
+            }else if(name==='Box6' && type==='gltf'){
+                url='../gltf/BoxTextured2048/BoxTextured.gltf';
+            }
+            loader.load( url, function ( gltf ) {
+                let minx = -0.5, miny = -0.8, minz= -20;
+                let maxx = 0.5, maxy=0.8, maxz=-3;
+                let edgeNum = N;
+                let scale = 0.05;
+                console.log('edgeNum', edgeNum, 'total', edgeNum*edgeNum*edgeNum);
+                for(let i=0;i<edgeNum;++i){
+                    for(let j=0;j<edgeNum;++j){
+                        for(let k=0;k<edgeNum;++k){
+                            let curx = minx + (maxx-minx)/(edgeNum-1)*i;
+                            let cury = miny + (maxy-miny)/(edgeNum-1)*j;
+                            let curz = minz + (maxz-minz)/(edgeNum-1)*k;
+                            let model = gltf.scene.clone();
+                            model.position.set(curx, cury, curz);
+                            model.scale.set(scale, scale, scale);
+                            scene.add(model);
+                        }
+                    }
+                }
+                loaded = true;
+            })
+
+			window.addEventListener('resize', onWindowResize, false);
+		}
+
+		function onWindowResize() {
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+			renderer.setSize(window.innerWidth, window.innerHeight);
+		}
+
+        let startFlag = true;
+        let startTime = null;
+        let windowFrameSum = 0;
+        let windowFrameCount = 0;
+        let windowStartTime = null;
+        let results = [];
+        let finished = false;
+
+		function animate(t) {
+            let frameStart = performance.now();
+			requestAnimationFrame(animate);
+            let time = performance.now();
+            stats.update(time);
+			renderer.render(scene, camera);
+
+            if (loaded && !finished) {
+                let frameEnd = performance.now();
+                let frametime = frameEnd - frameStart;
+
+                if (startFlag) {
+                    startTime = time;
+                    windowStartTime = time;
+                    startFlag = false;
+                    console.log('startTime', performance.now() + performance.timeOrigin);
+                }
+
+                windowFrameSum += frametime;
+                windowFrameCount += 1;
+
+                let elapsed = (time - startTime) / 1000;
+                let windowElapsed = (time - windowStartTime) / 1000;
+
+                if (windowElapsed >= WINDOW) {
+                    let avgFt = windowFrameSum / windowFrameCount;
+                    let windowFps = 1000 * windowFrameCount / (time - windowStartTime);
+                    let entry = {t: Math.round(elapsed), ft: parseFloat(avgFt.toFixed(2)), fps: parseFloat(windowFps.toFixed(1)), frames: windowFrameCount};
+                    results.push(entry);
+                    console.log('window', entry.t + 's', 'ft=' + entry.ft + 'ms', 'fps=' + entry.fps, 'frames=' + entry.frames);
+
+                    windowFrameSum = 0;
+                    windowFrameCount = 0;
+                    windowStartTime = time;
+                }
+
+                if (elapsed >= DURATION) {
+                    finished = true;
+                    console.log('=== RESULTS ===');
+                    console.log(JSON.stringify(results));
+                    console.log('=== END ===');
+                }
+            }
+		}
+        window.requestAnimationFrame(animate);
+    }
+
+	</script>
+</body>
+
+</html>

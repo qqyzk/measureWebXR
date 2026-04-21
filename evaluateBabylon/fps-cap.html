@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>FPS Cap Test - Babylon.js</title>
+		<style>
+			body { margin: 0; }
+		</style>
+        <script src="./src/babylon.js"></script>
+        <script src="./src/babylon.glTFFileLoader.js"></script>
+	</head>
+	<body>
+        <canvas id="renderCanvas"></canvas>
+        <input  id="button" type="button" value="start" >
+		<script>
+            const params = new URLSearchParams(window.location.search);
+            const fpsCap = Number(params.get('fpsCap') || '60');
+            const targetInterval = 1000 / fpsCap;
+            const N = 16; // 16^3 = 4096 models
+
+            var btn = document.getElementById("button");
+            btn.onclick = function conduct(){
+                console.log('click time',performance.now());
+                console.log('FPS cap:', fpsCap, 'interval:', targetInterval.toFixed(1), 'ms');
+                let loaded = false;
+            var canvas = document.getElementById('renderCanvas');
+            canvas.width=window.innerWidth;
+            canvas.height=window.innerHeight;
+            var engine = new BABYLON.Engine(canvas, {antialias:true,adaptToDeviceRatio:true});
+            var createScene = function(){
+                var scene = new BABYLON.Scene(engine);
+                scene.createDefaultCameraOrLight(true, true, true);
+                scene.activeCamera.alpha += Math.PI;
+                scene.clearColor = new BABYLON.Color3(0, 0, 0);
+                let minx=-0.5, miny=-1.1, minz=-10;
+                let maxx=0.5, maxy=1.1, maxz = -2;
+                let edgeNum=N;
+                let scale=0.05;
+                let url='../gltf/Box/Box.gltf';
+
+                BABYLON.SceneLoader.LoadAssetContainer(url,"",scene,
+                    (assets) => {
+                    for(let i=0;i<edgeNum;++i){
+                        for(let j=0;j<edgeNum;++j){
+                            for(let k=0;k<edgeNum;++k){
+                                let curx = minx + (maxx-minx)/(edgeNum-1)*i;
+                                let cury = miny+ (maxy-miny)/(edgeNum-1)*j;
+                                let curz = minz + (maxz-minz)/(edgeNum-1)*k;
+                                if(i==0 && k ==0 && j == 0){
+                                    assets.meshes[0].scaling = new BABYLON.Vector3(scale,scale,-1*scale);
+                                    assets.meshes[0].position = new BABYLON.Vector3(curx,cury,curz);
+                                } else{
+                                    let mesh= assets.meshes[0].clone();
+                                    mesh.scaling = new BABYLON.Vector3(scale,scale,-1*scale);
+                                    mesh.position = new BABYLON.Vector3(curx,cury,curz);
+                                    assets.meshes.push(mesh);
+                                }
+                            }
+                        }
+                    }
+                    assets.addAllToScene();
+                    loaded=true;
+                    console.log('scene loaded time',performance.now());
+                });
+
+                return scene;
+            }
+            var scene = createScene();
+            let startFlag = true;
+            let frameCount = 0;
+            let startTime = null;
+            let shouldLog = true;
+            let lastRenderTime = 0;
+            engine.runRenderLoop(function(){
+                let now = performance.now();
+                // FPS cap: skip render if not enough time has passed
+                if (now - lastRenderTime < targetInterval) return;
+                lastRenderTime = now;
+
+                scene.render();
+                if (loaded){
+                    let time = performance.now();
+                    if (startFlag) {
+                        startTime = time;
+                        startFlag = false;
+                        console.log('startTime',startTime);
+                    }
+                    frameCount += 1;
+                    if(frameCount % 1000 === 0) {
+                        let fps = 1000 * frameCount / (time - startTime);
+                        console.log(frameCount,fps,'fps');
+                    }
+                    if ((time - startTime) /1000 > 60 && shouldLog){
+                        shouldLog = false;
+                        let fps = 1000 * frameCount / (time - startTime);
+                        console.log('1min', (time - startTime)/1000, frameCount,fps,'fps');
+                    }
+                }
+            });
+            window.addEventListener('resize', function(){
+                engine.resize();
+            });
+        }
+		</script>
+	</body>
+</html>

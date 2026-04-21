@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>WebXR API Feature Overhead Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+        #info { position: absolute; top: 10px; left: 10px; color: white; font: 14px monospace;
+                background: rgba(0,0,0,0.6); padding: 8px; z-index: 10; }
+        #startBtn { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+                     padding: 16px 32px; font-size: 18px; z-index: 10; }
+    </style>
+</head>
+<body>
+    <div id="info">Loading...</div>
+    <button id="startBtn">START AR</button>
+    <canvas id="canvas"></canvas>
+    <script>
+    /**
+     * WebXR API Feature Overhead Test
+     *
+     * URL params:
+     *   ?feature=off          No XR session (regular rAF, baseline rendering)
+     *   ?feature=none         XR AR session, no extra features
+     *   ?feature=hit-test     XR AR session + hit-test
+     *   ?feature=plane-detection
+     *   ?feature=anchors
+     *   ?feature=light-estimation
+     *
+     * Renders 8 cubes with raw WebGL2. Measures frame time over 60 seconds.
+     */
+
+    const params = new URLSearchParams(window.location.search);
+    const FEATURE = params.get('feature') || 'none';
+    const DURATION = 60;
+    const N = 8; // 2^3 = 8 cubes
+    const edgeNum = 2;
+
+    const info = document.getElementById('info');
+    const startBtn = document.getElementById('startBtn');
+    info.textContent = `Feature: ${FEATURE} | Cubes: ${N} | Waiting...`;
+
+    // Scene bounds
+    const minx = -0.3, maxx = 0.3;
+    const miny = -0.3, maxy = 0.3;
+    const minz = -1.5, maxz = -0.5;
+    const cubeScale = 0.05;
+
+    // ===== Shader source (GLSL ES 300) =====
+    const vsSource = `#version 300 es
+layout(location = 0) in vec3 aPosition;
+layout(location = 1) in vec3 aNormal;
+
+uniform mat4 uProjection;
+uniform mat4 uView;
+uniform float uScale;
+uniform vec3 uOffset;
+
+out vec3 vNormal;
+
+void main() {
+    vec3 worldPos = aPosition * uScale + uOffset;
+    vNormal = aNormal;
+    gl_Position = uProjection * uView * vec4(worldPos, 1.0);
+}`;
+
+    const fsSource = `#version 300 es
+precision mediump float;
+
+in vec3 vNormal;
+out vec4 fragColor;
+
+const vec3 uLightDir = vec3(0.5774, 0.5774, 0.5774);
+const vec3 uColor = vec3(0.8, 0.4, 0.2);
+const float uAmbient = 0.3;
+
+void main() {
+    float diff = max(dot(normalize(vNormal), uLightDir), 0.0);
+    vec3 color = uColor * (uAmbient + (1.0 - uAmbient) * diff);
+    fragColor = vec4(color, 1.0);
+}`;
+
+    // ===== Matrix utilities =====
+    function perspective(fov, aspect, near, far) {
+        const f = 1.0 / Math.tan(fov / 2);
+        const nf = 1.0 / (near - far);
+        return new Float32Array([
+            f / aspect, 0, 0, 0,
+            0, f, 0, 0,
+            0, 0, (far + near) * nf, -1,
+            0, 0, 2 * far * near * nf, 0
+        ]);
+    }
+
+    function lookAt(eye, center, up) {
+        let fx = center[0]-eye[0], fy = center[1]-eye[1], fz = center[2]-eye[2];
+        let len = Math.sqrt(fx*fx + fy*fy + fz*fz);
+        fx /= len; fy /= len; fz /= len;
+        let sx = fy*up[2]-fz*up[1], sy = fz*up[0]-fx*up[2], sz = fx*up[1]-fy*up[0];
+        len = Math.sqrt(sx*sx + sy*sy + sz*sz);
+        sx /= len; sy /= len; sz /= len;
+        let ux = sy*fz-sz*fy, uy = sz*fx-sx*fz, uz = sx*fy-sy*fx;
+        return new Float32Array([
+            sx, ux, -fx, 0,
+            sy, uy, -fy, 0,
+            sz, uz, -fz, 0,
+            -(sx*eye[0]+sy*eye[1]+sz*eye[2]),
+            -(ux*eye[0]+uy*eye[1]+uz*eye[2]),
+            (fx*eye[0]+fy*eye[1]+fz*eye[2]),
+            1
+        ]);
+    }
+
+    // ===== Cube geometry =====
+    function createCubeVertices() {
+        const p = 0.5;
+        return new Float32Array([
+            -p,-p, p, 0,0,1,  p,-p, p, 0,0,1,  p, p, p, 0,0,1,
+            -p,-p, p, 0,0,1,  p, p, p, 0,0,1, -p, p, p, 0,0,1,
+             p,-p,-p, 0,0,-1, -p,-p,-p, 0,0,-1, -p, p,-p, 0,0,-1,
+             p,-p,-p, 0,0,-1, -p, p,-p, 0,0,-1,  p, p,-p, 0,0,-1,
+             p,-p, p, 1,0,0,  p,-p,-p, 1,0,0,  p, p,-p, 1,0,0,
+             p,-p, p, 1,0,0,  p, p,-p, 1,0,0,  p, p, p, 1,0,0,
+            -p,-p,-p,-1,0,0, -p,-p, p,-1,0,0, -p, p, p,-1,0,0,
+            -p,-p,-p,-1,0,0, -p, p, p,-1,0,0, -p, p,-p,-1,0,0,
+            -p, p, p, 0,1,0,  p, p, p, 0,1,0,  p, p,-p, 0,1,0,
+            -p, p, p, 0,1,0,  p, p,-p, 0,1,0, -p, p,-p, 0,1,0,
+            -p,-p,-p, 0,-1,0, p,-p,-p, 0,-1,0,  p,-p, p, 0,-1,0,
+            -p,-p,-p, 0,-1,0, p,-p, p, 0,-1,0, -p,-p, p, 0,-1,0,
+        ]);
+    }
+
+    // ===== Precompute 8 cube offsets =====
+    function createOffsets() {
+        const offsets = [];
+        for (let i = 0; i < edgeNum; i++) {
+            for (let j = 0; j < edgeNum; j++) {
+                for (let k = 0; k < edgeNum; k++) {
+                    offsets.push(
+                        minx + (maxx - minx) / (edgeNum - 1) * i,
+                        miny + (maxy - miny) / (edgeNum - 1) * j,
+                        minz + (maxz - minz) / (edgeNum - 1) * k
+                    );
+                }
+            }
+        }
+        return offsets;
+    }
+
+    // ===== GL setup =====
+    const canvas = document.getElementById('canvas');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const glAttrs = { xrCompatible: FEATURE !== 'off', alpha: true };
+    const gl = canvas.getContext('webgl2', glAttrs);
+    if (!gl) { info.textContent = 'WebGL 2.0 not supported'; throw new Error(); }
+
+    function compileShader(src, type) {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(s));
+            return null;
+        }
+        return s;
+    }
+
+    const vs = compileShader(vsSource, gl.VERTEX_SHADER);
+    const fs = compileShader(fsSource, gl.FRAGMENT_SHADER);
+    const program = gl.createProgram();
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error(gl.getProgramInfoLog(program));
+        throw new Error();
+    }
+    gl.useProgram(program);
+
+    const uProjection = gl.getUniformLocation(program, 'uProjection');
+    const uView = gl.getUniformLocation(program, 'uView');
+    const uScaleLoc = gl.getUniformLocation(program, 'uScale');
+    const uOffset = gl.getUniformLocation(program, 'uOffset');
+
+    gl.uniform1f(uScaleLoc, cubeScale);
+
+    // VAO
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+    const cubeVBO = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, cubeVBO);
+    gl.bufferData(gl.ARRAY_BUFFER, createCubeVertices(), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 24, 0);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 24, 12);
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.CULL_FACE);
+
+    const offsets = createOffsets();
+
+    // ===== Rendering function (shared by XR and non-XR paths) =====
+    function renderCubes(projMatrix, viewMatrix) {
+        gl.useProgram(program);
+        gl.bindVertexArray(vao);
+        gl.uniformMatrix4fv(uProjection, false, projMatrix);
+        gl.uniformMatrix4fv(uView, false, viewMatrix);
+        for (let i = 0; i < N; i++) {
+            gl.uniform3f(uOffset, offsets[i*3], offsets[i*3+1], offsets[i*3+2]);
+            gl.drawArrays(gl.TRIANGLES, 0, 36);
+        }
+    }
+
+    // ===== Measurement state =====
+    let frameCount = 0;
+    let startTime = null;
+    let shouldLog = true;
+    let totalFT = 0;
+
+    function logFrame(ft) {
+        const now = performance.now();
+        if (startTime === null) {
+            startTime = now;
+            console.log('render start', now);
+        }
+        totalFT += ft;
+        frameCount++;
+
+        if (frameCount % 500 === 0) {
+            const elapsed = now - startTime;
+            const fps = 1000 * frameCount / elapsed;
+            const avgFT = totalFT / frameCount;
+            console.log(frameCount, fps.toFixed(1), 'fps', avgFT.toFixed(3), 'ms/frame');
+            info.textContent = `Feature: ${FEATURE} | Cubes: ${N} | FPS: ${fps.toFixed(1)} | FT: ${avgFT.toFixed(3)}ms | Frames: ${frameCount}`;
+        }
+        if ((now - startTime) / 1000 > DURATION && shouldLog) {
+            shouldLog = false;
+            const fps = 1000 * frameCount / (now - startTime);
+            const avgFT = totalFT / frameCount;
+            console.log('done', fps.toFixed(1), 'fps', avgFT.toFixed(3), 'ms/frame', frameCount, 'frames');
+        }
+    }
+
+    // ===== Non-XR path (feature=off) =====
+    function startNonXR() {
+        info.textContent = `Feature: off | Cubes: ${N} | Running...`;
+        startBtn.style.display = 'none';
+
+        const aspect = canvas.width / canvas.height;
+        const projMatrix = perspective(45 * Math.PI / 180, aspect, 0.1, 100);
+        const viewMatrix = lookAt([0, 0, 1], [0, 0, -1], [0, 1, 0]);
+
+        gl.clearColor(0.1, 0.1, 0.1, 1.0);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+
+        function render() {
+            const t0 = performance.now();
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            renderCubes(projMatrix, viewMatrix);
+            const ft = performance.now() - t0;
+            logFrame(ft);
+            requestAnimationFrame(render);
+        }
+        requestAnimationFrame(render);
+    }
+
+    // ===== XR path =====
+    let xrSession = null;
+    let xrRefSpace = null;
+    let xrGLLayer = null;
+    let hitTestSource = null;
+    let lightProbe = null;
+
+    let sessionStartTime = null;
+
+    async function startXR() {
+        info.textContent = `Feature: ${FEATURE} | Cubes: ${N} | Starting AR...`;
+        startBtn.style.display = 'none';
+
+        if (!navigator.xr) {
+            info.textContent = 'WebXR not available';
+            return;
+        }
+
+        // Build session init
+        const sessionInit = { requiredFeatures: ['local'] };
+        if (FEATURE === 'anchors') {
+            sessionInit.optionalFeatures = ['anchors', 'hit-test'];
+        } else if (FEATURE !== 'none') {
+            sessionInit.optionalFeatures = [FEATURE];
+        }
+
+        const t0 = performance.now();
+        console.log('requesting AR session...', t0);
+
+        try {
+            xrSession = await navigator.xr.requestSession('immersive-ar', sessionInit);
+        } catch (e) {
+            info.textContent = 'Failed to start AR: ' + e.message;
+            console.error(e);
+            return;
+        }
+
+        sessionStartTime = performance.now();
+        console.log('AR session started', sessionStartTime, 'setup took', (sessionStartTime - t0).toFixed(0), 'ms');
+
+        xrGLLayer = new XRWebGLLayer(xrSession, gl);
+        await xrSession.updateRenderState({ baseLayer: xrGLLayer });
+        xrRefSpace = await xrSession.requestReferenceSpace('local');
+        console.log('reference space ready', performance.now());
+
+        // Feature-specific setup
+        if (FEATURE === 'hit-test' || FEATURE === 'anchors') {
+            try {
+                const viewerSpace = await xrSession.requestReferenceSpace('viewer');
+                hitTestSource = await xrSession.requestHitTestSource({ space: viewerSpace });
+                console.log('hit-test source created', performance.now(), 'waiting for results...');
+            } catch (e) {
+                console.warn('hit-test setup failed:', e);
+            }
+        }
+
+        if (FEATURE === 'plane-detection') {
+            console.log('plane-detection requested, waiting for planes...');
+        }
+
+        if (FEATURE === 'light-estimation') {
+            try {
+                lightProbe = await xrSession.requestLightProbe();
+                console.log('light probe created', performance.now(), 'waiting for estimates...');
+            } catch (e) {
+                console.warn('light probe setup failed:', e);
+            }
+        }
+
+        xrSession.addEventListener('end', () => {
+            console.log('XR session ended');
+            xrSession = null;
+        });
+
+        xrSession.requestAnimationFrame(onXRFrame);
+    }
+
+    let xrAnchor = null;
+    let featureActive = false;
+
+    // For 'none' and 'off', feature is always considered active
+    if (FEATURE === 'none' || FEATURE === 'off') {
+        featureActive = true;
+    }
+
+    function onXRFrame(timestamp, frame) {
+        const session = frame.session;
+        session.requestAnimationFrame(onXRFrame);
+
+        const t0 = performance.now();
+
+        // Bind XR framebuffer
+        gl.bindFramebuffer(gl.FRAMEBUFFER, xrGLLayer.framebuffer);
+
+        const pose = frame.getViewerPose(xrRefSpace);
+        if (!pose) {
+            return; // No tracking yet
+        }
+
+        // Feature-specific per-frame API calls + active detection
+        if (FEATURE === 'hit-test' || FEATURE === 'anchors') {
+            if (hitTestSource) {
+                const hitResults = frame.getHitTestResults(hitTestSource);
+                if (hitResults.length > 0) {
+                    if (!featureActive) {
+                        featureActive = true;
+                        const initTime = (performance.now() - sessionStartTime).toFixed(0);
+                        console.log('feature active: hit-test returning results, init took', initTime, 'ms');
+                    }
+                    // For anchors: create one anchor from first hit result
+                    if (FEATURE === 'anchors' && !xrAnchor) {
+                        const hitPose = hitResults[0].getPose(xrRefSpace);
+                        if (hitPose && frame.createAnchor) {
+                            frame.createAnchor(hitPose.transform, xrRefSpace)
+                                .then(a => { xrAnchor = a; console.log('anchor created'); })
+                                .catch(() => {});
+                        }
+                    }
+                }
+            }
+        }
+
+        if (FEATURE === 'plane-detection') {
+            if (frame.detectedPlanes && frame.detectedPlanes.size > 0) {
+                if (!featureActive) {
+                    featureActive = true;
+                    const initTime = (performance.now() - sessionStartTime).toFixed(0);
+                    console.log('feature active: planes detected (' + frame.detectedPlanes.size + '), init took', initTime, 'ms');
+                }
+                for (const plane of frame.detectedPlanes) {
+                    frame.getPose(plane.planeSpace, xrRefSpace);
+                    const polygon = plane.polygon;
+                }
+            }
+        }
+
+        if (FEATURE === 'light-estimation') {
+            if (lightProbe) {
+                try {
+                    const estimate = frame.getLightEstimate(lightProbe);
+                    if (estimate) {
+                        if (!featureActive) {
+                            featureActive = true;
+                            const initTime = (performance.now() - sessionStartTime).toFixed(0);
+                            console.log('feature active: light estimation returning data, init took', initTime, 'ms');
+                        }
+                        const sh = estimate.sphericalHarmonicsCoefficients;
+                        const dir = estimate.primaryLightDirection;
+                        const intensity = estimate.primaryLightIntensity;
+                    }
+                } catch (e) { /* noop */ }
+            }
+        }
+
+        if (FEATURE === 'anchors' && xrAnchor) {
+            if (!featureActive) {
+                featureActive = true;
+                const initTime = (performance.now() - sessionStartTime).toFixed(0);
+                console.log('feature active: anchor tracked, init took', initTime, 'ms');
+            }
+            try {
+                frame.getPose(xrAnchor.anchorSpace, xrRefSpace);
+            } catch (e) { /* noop */ }
+        }
+
+        // Render for each view (typically 1 view in AR on phone)
+        for (const view of pose.views) {
+            const viewport = xrGLLayer.getViewport(view);
+            gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+            gl.clearColor(0, 0, 0, 0); // transparent for AR
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            renderCubes(view.projectionMatrix, view.transform.inverse.matrix);
+        }
+
+        const ft = performance.now() - t0;
+        // Only count frames after feature is active
+        if (featureActive) {
+            logFrame(ft);
+        }
+    }
+
+    // ===== Start button =====
+    startBtn.addEventListener('click', () => {
+        if (FEATURE === 'off') {
+            startNonXR();
+        } else {
+            startXR();
+        }
+    });
+
+    // Update button text
+    if (FEATURE === 'off') {
+        startBtn.textContent = 'START';
+    }
+    </script>
+</body>
+</html>

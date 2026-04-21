@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Perception: Face Detection (BlazeFace)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <style>
+        body { margin: 0; overflow: hidden; background: #111; }
+        video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+        #info { position: absolute; top: 10px; left: 10px; color: white; font: 14px monospace;
+                background: rgba(0,0,0,0.6); padding: 8px; z-index: 10; max-width: 90%; }
+        #startBtn { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+                     padding: 16px 32px; font-size: 18px; z-index: 10; }
+    </style>
+</head>
+<body>
+    <div id="info">Loading TF.js + BlazeFace model...</div>
+    <button id="startBtn" disabled>START</button>
+    <video id="video" autoplay playsinline></video>
+
+    <script src="libs/tf.min.js"></script>
+    <script src="libs/blazeface.min.js"></script>
+    <script>
+    const DURATION = 60;
+    const WARMUP_FRAMES = 30;
+
+    const info = document.getElementById('info');
+    const startBtn = document.getElementById('startBtn');
+    const video = document.getElementById('video');
+
+    let model = null;
+
+    // ===== Load model =====
+    async function loadModel() {
+        info.textContent = 'Loading TF.js backend...';
+        await tf.setBackend('webgl');
+        await tf.ready();
+        info.textContent = 'Loading BlazeFace model...';
+        model = await blazeface.load({modelUrl: 'models/blazeface/model.json'});
+        info.textContent = 'Model ready. Press START.';
+        startBtn.disabled = false;
+    }
+    loadModel();
+
+    // ===== Camera =====
+    async function startCamera() {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user', width: 640, height: 480 }
+        });
+        video.srcObject = stream;
+        await new Promise(r => video.onloadedmetadata = r);
+        await video.play();
+    }
+
+    // ===== Measurement =====
+    let frameCount = 0;
+    let totalCount = 0;
+    let startTime = null;
+    let totalInference = 0;
+    let shouldLog = true;
+    let running = false;
+
+    function logInference(inferenceTime) {
+        totalCount++;
+        if (totalCount <= WARMUP_FRAMES) return;
+
+        const now = performance.now();
+        if (startTime === null) {
+            startTime = now;
+            console.log('measurement start (after warmup)', now);
+        }
+
+        totalInference += inferenceTime;
+        frameCount++;
+
+        if (frameCount % 100 === 0) {
+            const avgInf = totalInference / frameCount;
+            const elapsed = (now - startTime) / 1000;
+            const ips = frameCount / elapsed;
+            console.log(frameCount, 'avg:', avgInf.toFixed(1), 'ms', 'ips:', ips.toFixed(1));
+            info.textContent = `Face Detection (BlazeFace) | Avg: ${avgInf.toFixed(1)}ms | IPS: ${ips.toFixed(1)} | Frames: ${frameCount}`;
+        }
+        if ((now - startTime) / 1000 > DURATION && shouldLog) {
+            shouldLog = false;
+            const avgInf = totalInference / frameCount;
+            const ips = frameCount / ((now - startTime) / 1000);
+            console.log('done', avgInf.toFixed(1), 'ms/inference', ips.toFixed(1), 'ips', frameCount, 'frames');
+            running = false;
+        }
+    }
+
+    async function runLoop() {
+        while (running) {
+            const t0 = performance.now();
+            const predictions = await model.estimateFaces(video, false);
+            const ft = performance.now() - t0;
+            logInference(ft);
+            await new Promise(r => requestAnimationFrame(r));
+        }
+    }
+
+    // ===== Start =====
+    startBtn.addEventListener('click', async () => {
+        startBtn.style.display = 'none';
+        info.textContent = 'Starting camera...';
+        await startCamera();
+        info.textContent = 'Running face detection...';
+        running = true;
+        runLoop();
+    });
+    </script>
+</body>
+</html>

@@ -4,3 +4,25 @@ energy/*.xlsx
 energy/results
 example.com*
 energy/*.md
+
+# OS
+.DS_Store
+
+# Android build artifacts
+evaluateNative/.gradle/
+evaluateNative/.idea/
+evaluateNative/app/build/
+evaluateNative/local.properties
+
+# TF.js models (large binary files)
+evaluateXRFeatures/models/
+evaluateXRFeatures/libs/tf.min.js
+
+# Texture test assets (large images)
+gltf/BoxTextured4_512/
+gltf/BoxTextured4_1024/
+gltf/BoxTextured4_4096/
+
+# Node modules
+node_modules/
+package-lock.json

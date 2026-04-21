@@ -1,5 +1,7 @@
+#!/bin/bash
 if [ "$#" -ne 1 ]; then
-    echo "Usage: ./energy-pixel-odpm.sh <output-name>"
+    echo "Usage: ./energy-pixel-odpm-10min.sh <output-name>"
+    echo "Example: ./energy-pixel-odpm-10min.sh three-4096-10min"
     exit 1
 fi
 
@@ -34,7 +36,9 @@ data_sources: {
         }
     }
 }
-duration_ms: 60000
+duration_ms: 600000
 
 EOF
 
+echo "Trace saved to /data/misc/perfetto-traces/$1"
+echo "Run: adb pull /data/misc/perfetto-traces/$1 ./"
