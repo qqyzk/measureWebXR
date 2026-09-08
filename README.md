@@ -2,8 +2,10 @@
 ## Introdunction
 We conduct the first empirical study of web-based XR. 
 
-We select the seven most popular frameworks for mobile XR in browsers and investigate their current capacity for
-XR by evaluating their runtime performance, including 3D rendering, camera capturing, and real-world understanding.
+We select the seven most popular frameworks for mobile XR in browsers and analyze 181 real-world Web3D applications.
+We investigate the runtime performance of these frameworks and applications across 3D rendering, camera capturing, and real-world understanding.
+
+The annotated list of 181 real-world Web3D applications analyzed in the paper is available in [`realApplication/real-world-web3d-applications.xlsx`](realApplication/real-world-web3d-applications.xlsx).
 
 The seven chosen frameworks are as follows:
 
@@ -161,4 +163,3 @@ Relationship between first loading time and FPS (not well-performed) with and wi
 Average frame time (ms) of different frameworks and different 3D model complexity:
 
 <img src='docs/timeleft.png' height='150'>
-
